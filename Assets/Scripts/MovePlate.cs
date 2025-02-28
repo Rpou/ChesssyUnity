@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -50,6 +51,10 @@ public class MovePlate : MonoBehaviour
         
         CheckIfCreateQueenFromPawn(piece, cp, game);
         inCheck = piece.CheckIfNextAttackCanKillKing();
+        if (inCheck)
+        {
+            Debug.Log("King in check");
+        }
         
         controller.GetComponent<Game>().NextTurn();
         

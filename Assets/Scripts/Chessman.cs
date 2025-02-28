@@ -295,9 +295,10 @@ public class Chessman : MonoBehaviour
             
         }
 
-        
+        Debug.Log(name + " is checking if it can attack the king...");
         switch (this.name)
-        {
+        { 
+                
             case "black_queen":
             case "white_queen":
                 // Queens move like rooks and bishops combined
@@ -359,22 +360,24 @@ public class Chessman : MonoBehaviour
     /// <param name="y">The y coordinate</param>
     public bool CheckPointMovePlate(int x, int y){
         Game sc = controller.GetComponent<Game>();
+        
+        GameObject target = sc.GetPosition(x, y);
         return sc.PositionOnBoard(x, y) && sc.GetPosition(x, y) != null && 
-               sc.GetPosition(x,y).GetComponent<Chessman>().player != player && name is "black_king" or "white_king";
+               sc.GetPosition(x,y).GetComponent<Chessman>().player != player && target.name is "black_king" or "white_king";
     }
 
     // Handles pawn movement and attacking
     public bool CheckPawnMovePlate(int x, int y, bool isWhite){
         Game sc = controller.GetComponent<Game>();
-        
+        GameObject target = sc.GetPosition(x, y);
         if(sc.PositionOnBoard(x + 1, y) && sc.GetPosition(x + 1, y) != null && 
-           sc.GetPosition(x + 1,y).GetComponent<Chessman>().player != player && name is "black_king" or "white_king")
+           sc.GetPosition(x + 1,y).GetComponent<Chessman>().player != player && target.name is "black_king" or "white_king")
         {
             return true;
         }
 
         return sc.PositionOnBoard(x - 1, y) && sc.GetPosition(x - 1, y) != null && 
-               sc.GetPosition(x - 1,y).GetComponent<Chessman>().player != player && name is "black_king" or "white_king";
+               sc.GetPosition(x - 1,y).GetComponent<Chessman>().player != player && target.name is "black_king" or "white_king";
     }
     
     // Handles straight-line movement (used for rooks, bishops, queens)
@@ -385,16 +388,32 @@ public class Chessman : MonoBehaviour
         int x = xBoard + xIncrement;
         int y = yBoard + yIncrement;
 
-        // Keep moving in the direction until hitting another piece or the edge
+        // Ensure x, y stay within board limits before accessing
         while (sc.PositionOnBoard(x, y) && sc.GetPosition(x, y) == null)
         {
             x += xIncrement;
             y += yIncrement;
         }
 
-        // If an enemy piece is found, spawn an attack plate
-        return sc.PositionOnBoard(x, y) && sc.GetPosition(x, y).GetComponent<Chessman>().player != player && name is "black_king" or "white_king";
+        
+
+        // Before accessing the board, ensure (x, y) is still in bounds
+        if (!sc.PositionOnBoard(x, y))
+        {
+            return false; // Don't check further, as we're out of bounds
+        }
+
+        GameObject target = sc.GetPosition(x, y);
+
+        // Make sure the target is not null before accessing properties
+        if (target != null && target.GetComponent<Chessman>().player != player)
+        {
+            return target.name is "black_king" or "white_king";
+        }
+
+        return false;
     }
+
     
     public bool CheckLMovePlate()
     {
