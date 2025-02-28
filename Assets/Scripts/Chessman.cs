@@ -45,7 +45,6 @@ public class Chessman : MonoBehaviour
             case "white_pawn": this.GetComponent<SpriteRenderer>().sprite = white_pawn; player = "white"; break;
             
         }
-        
     }
 
     public void SetCoords()
@@ -360,8 +359,8 @@ public class Chessman : MonoBehaviour
     /// <param name="y">The y coordinate</param>
     public bool CheckPointMovePlate(int x, int y){
         Game sc = controller.GetComponent<Game>();
-        GameObject cp = sc.GetPosition(x,y);
-        return sc.PositionOnBoard(x,y) && cp.GetComponent<Chessman>().player != player && name is "black_king" or "white_king";
+        return sc.PositionOnBoard(x, y) && sc.GetPosition(x, y) != null && 
+               sc.GetPosition(x,y).GetComponent<Chessman>().player != player && name is "black_king" or "white_king";
     }
 
     // Handles pawn movement and attacking

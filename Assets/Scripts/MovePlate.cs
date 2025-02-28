@@ -49,7 +49,7 @@ public class MovePlate : MonoBehaviour
         cp = controller.GetComponent<Game>().GetPosition(matrixX, matrixY);
         
         CheckIfCreateQueenFromPawn(piece, cp, game);
-        //inCheck = piece.CheckIfNextAttackCanKillKing();
+        inCheck = piece.CheckIfNextAttackCanKillKing();
         
         controller.GetComponent<Game>().NextTurn();
         
