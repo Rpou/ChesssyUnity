@@ -36,6 +36,8 @@ public abstract class Piece : MonoBehaviour
     }
 
     protected abstract void InitiateMovePlates();
+    
+    public abstract King CanSeeKing();
 
     public void SetCoords()
     {

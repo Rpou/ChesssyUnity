@@ -17,8 +17,6 @@ public class MovePlate : MonoBehaviour
 
     // False: movement, true: attacking
     public bool attack = false;
-    
-    public bool inCheck = false;
 
     public void Start(){
         if(attack){
@@ -50,11 +48,11 @@ public class MovePlate : MonoBehaviour
         cp = controller.GetComponent<Game>().GetPosition(matrixX, matrixY);
         
         game.CheckIfCreateQueenFromPawn(matrixX, matrixY,cp, game);
-        //inCheck = piece.CheckIfCanSeeKing();
-        if (inCheck)
-        {
-            Debug.Log("King in check");
-        }
+        //inCheck = piece.CanSeeKing();
+        //if (inCheck)
+        //{
+          //  Debug.Log("King in check");
+        //}
         
         game.NextTurn();
         
