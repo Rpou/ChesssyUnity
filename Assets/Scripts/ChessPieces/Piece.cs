@@ -1,125 +1,74 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System;
 using UnityEngine;
 
 public abstract class Piece : MonoBehaviour
 {
-    // References
-    public GameObject controller;
-    public GameObject movePlate;
+    protected Game game;
+    protected SpriteManager spriteManager;
+    
+    private int _xBoard = -1;
+    private int _yBoard = -1;
+    private string _player;
+    
+    private void Start()
+    {
+        game = GameObject.FindGameObjectWithTag("GameController").GetComponent<Game>();
+        spriteManager = Resources.Load<SpriteManager>("SpriteManager");
 
-    // Board positions
-    protected int xBoard = -1;
-    protected int yBoard = -1;
+        // Set the piece sprite based on name
+        GetComponent<SpriteRenderer>().sprite = spriteManager.GetSprite(name);
 
-    // Which player owns this piece ("white" or "black")
-    public string player;
+        // Determine player color based on name
+        _player = name.StartsWith("black") ? "black" : "white";
 
-    // The sprite for this piece – assign it via the inspector or in the subclass.
-    public Sprite pieceSprite;
-
-    // Called when the piece is created/activated.
-    public virtual void Activate() {
-        controller = GameObject.FindGameObjectWithTag("GameController");
+        // Set position on board
         SetCoords();
-        GetComponent<SpriteRenderer>().sprite = pieceSprite;
+    }
+    
+    private void OnMouseUp()
+    {
+        // If it's this piece's turn and the game is not over
+        if (!game.IsGameOver() && game.GetCurrentPlayer() == _player)
+        {
+            game.DestroyMovePlates();  // Remove any existing move plates
+            InitiateMovePlates(); // Generate new move plates
+        }
     }
 
-    // Set the world coordinates based on the board position.
-    public void SetCoords() {
-        float x = xBoard;
-        float y = yBoard;
+    protected abstract void InitiateMovePlates();
+
+    public void SetCoords()
+    {
+        float x = _xBoard;
+        float y = _yBoard;
+
+        // Scale position to fit the board
         x *= 0.66f;
         y *= 0.66f;
+
+        // Offset to align with the board correctly
         x += -2.3f;
         y += -2.3f;
-        transform.position = new Vector3(x, y, -1.0f);
+
+        // Move the piece to the calculated position
+        this.transform.position = new Vector3(x, y, -1.0f);
     }
 
-    // Getters and setters for board position.
-    public int GetXBoard() { return xBoard; }
-    public int GetYBoard() { return yBoard; }
-    public void SetXBoard(int x) { xBoard = x; }
-    public void SetYBoard(int y) { yBoard = y; }
-
-    // When the player clicks the piece.
-    private void OnMouseUp() {
-        Game game = controller.GetComponent<Game>();
-        if (!game.IsGameOver() && game.GetCurrentPlayer() == player) {
-            DestroyMovePlates();
-            GenerateMovePlates();
-        }
+    public string GetPlayer()
+    {
+        return _player;
     }
 
-    // Remove any existing move plates.
-    public void DestroyMovePlates() {
-        GameObject[] movePlates = GameObject.FindGameObjectsWithTag("MovePlate");
-        foreach (GameObject mp in movePlates) {
-            Destroy(mp);
-        }
+    public int GetxBoard()
+    {
+        return _xBoard;
     }
 
-    // Each subclass must implement its own move generation.
-    public abstract void GenerateMovePlates();
-
-    // --- Helper Methods (available to all subclasses) ---
-
-    // Spawns a non-attacking move plate.
-    protected void SpawnMovePlate(int matrixX, int matrixY) {
-        float x = matrixX;
-        float y = matrixY;
-        x *= 0.66f;
-        y *= 0.66f;
-        x += -2.3f;
-        y += -2.3f;
-        GameObject mp = Instantiate(movePlate, new Vector3(x, y, -3.0f), Quaternion.identity);
-        MovePlate mpScript = mp.GetComponent<MovePlate>();
-        mpScript.SetReference(gameObject);
-        mpScript.SetCoords(matrixX, matrixY);
+    public int GetyBoard()
+    {
+        return _yBoard;
     }
-
-    // Spawns an attacking move plate.
-    protected void SpawnAttackPlate(int matrixX, int matrixY) {
-        float x = matrixX;
-        float y = matrixY;
-        x *= 0.66f;
-        y *= 0.66f;
-        x += -2.3f;
-        y += -2.3f;
-        GameObject mp = Instantiate(movePlate, new Vector3(x, y, -3.0f), Quaternion.identity);
-        MovePlate mpScript = mp.GetComponent<MovePlate>();
-        mpScript.attack = true;
-        mpScript.SetReference(gameObject);
-        mpScript.SetCoords(matrixX, matrixY);
-    }
-
-    // Generates a move plate at a specific point (used by kings, knights, etc.).
-    protected void GeneratePointMovePlate(int x, int y) {
-        Game game = controller.GetComponent<Game>();
-        if (game.PositionOnBoard(x, y)) {
-            GameObject target = game.GetPosition(x, y);
-            if (target == null) {
-                SpawnMovePlate(x, y);
-            }
-            else if (target.GetComponent<Piece>().player != player) {
-                SpawnAttackPlate(x, y);
-            }
-        }
-    }
-
-    // Generates move plates along a line (for rooks, bishops, queens).
-    protected void GenerateLineMovePlates(int xIncrement, int yIncrement) {
-        Game game = controller.GetComponent<Game>();
-        int x = xBoard + xIncrement;
-        int y = yBoard + yIncrement;
-        while (game.PositionOnBoard(x, y) && game.GetPosition(x, y) == null) {
-            SpawnMovePlate(x, y);
-            x += xIncrement;
-            y += yIncrement;
-        }
-        if (game.PositionOnBoard(x, y) && game.GetPosition(x, y) != null &&
-            game.GetPosition(x, y).GetComponent<Piece>().player != player) {
-            SpawnAttackPlate(x, y);
-        }
-    }
+    
+    public void SetXBoard(int x) { _xBoard = x; }
+    public void SetYBoard(int y) { _yBoard = y; }
 }

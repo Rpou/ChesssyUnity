@@ -7,6 +7,7 @@ public class MovePlate : MonoBehaviour
 {
 
     public GameObject controller;
+    
 
     GameObject reference = null;
 
@@ -38,9 +39,8 @@ public class MovePlate : MonoBehaviour
         }
         
         Game game = controller.GetComponent<Game>();
-        game.SetPositionEmpty(reference.GetComponent<Chessman>().GetXBoard(), reference.GetComponent<Chessman>().GetYBoard());
-
-        var piece = reference.GetComponent<Chessman>();
+        game.SetPositionEmpty(reference.GetComponent<Piece>().GetxBoard(), reference.GetComponent<Piece>().GetyBoard());
+        var piece = reference.GetComponent<Piece>();
         
         piece.SetXBoard(matrixX);
         piece.SetYBoard(matrixY);
@@ -49,16 +49,16 @@ public class MovePlate : MonoBehaviour
         game.SetPosition(reference);
         cp = controller.GetComponent<Game>().GetPosition(matrixX, matrixY);
         
-        CheckIfCreateQueenFromPawn(piece, cp, game);
-        inCheck = piece.CheckIfNextAttackCanKillKing();
+        game.CheckIfCreateQueenFromPawn(matrixX, matrixY,cp, game);
+        //inCheck = piece.CheckIfCanSeeKing();
         if (inCheck)
         {
             Debug.Log("King in check");
         }
         
-        controller.GetComponent<Game>().NextTurn();
+        game.NextTurn();
         
-        reference.GetComponent<Chessman>().DestroyMovePlates();
+        game.DestroyMovePlates();
     }
 
     public void SetCoords(int x, int y){
@@ -72,20 +72,6 @@ public class MovePlate : MonoBehaviour
 
     public GameObject GetReference(){
         return reference;
-    }
-
-    public void CheckIfCreateQueenFromPawn(Chessman piece, GameObject cp, Game game) {
-        if (matrixY == 0 && piece.name == "black_pawn")
-        {
-            Destroy(cp);
-            game.Create("black_queen", matrixX, matrixY);
-        }
-
-        if (matrixY == 7 && piece.name == "white_pawn")
-        {
-            Destroy(cp);
-            game.Create("white_queen", matrixX, matrixY);
-        }
     }
 
 }
