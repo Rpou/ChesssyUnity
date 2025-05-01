@@ -4,44 +4,20 @@ using UnityEngine;
 
 public class King : Piece
 {
-    private bool _inCheck = false;
+    public bool _inCheck;
+    private List<Vector2Int> _moveSquares = new List<Vector2Int>();
+    private List<Vector2Int> _attackSquares = new List<Vector2Int>();
     
-    protected override void InitiateMovePlates()
+    public override void AllLegalMoves()
     {
-        (List<Vector2Int> moveSquares, List<Vector2Int> attackSquares) = MovementPatterns.GetKingMoves(this, game);
+        (_moveSquares, _attackSquares) = MovementPatterns.GetKingMoves(this, game);
 
-        MovementPatterns.SpawnAllMovePlates(moveSquares, attackSquares, this, game);
+        MovementPatterns.SpawnAllMovePlates(_moveSquares, _attackSquares, this, game);
     }
     
     public override King CanSeeKing()
     {
         return null;
-    }
-
-    public bool CheckIfInCheck()
-    {
-        if (GetPlayer().Equals("white"))
-        {
-            foreach (var piece in game.playerWhite)
-            {
-                if (piece.GetComponent<Piece>().CanSeeKing().name.StartsWith("black"))
-                {
-                    piece.GetComponent<King>().SetInCheck(true);
-                    return true;
-                }
-            }
-
-            foreach (var piece in game.playerBlack)
-            {
-                
-            }
-        }
-        else if (GetPlayer().Equals("black"))
-        {
-            
-        }
-        
-        return false;
     }
 
     public bool GetInCheck()
@@ -51,6 +27,23 @@ public class King : Piece
     
     public void SetInCheck(bool inCheck)
     {
-        _inCheck = inCheck;
+        if (inCheck)
+        {
+            GetComponent<SpriteRenderer>().color = Color.red;
+            _inCheck = true;
+            return;
+        }
+
+        GetComponent<SpriteRenderer>();
+        _inCheck = false;
+    }
+    
+    public override List<Vector2Int> GetMoveSquares()
+    {
+        return _moveSquares;
+    }
+    public override List<Vector2Int> GetAttackSquares()
+    {
+        return _attackSquares;
     }
 }

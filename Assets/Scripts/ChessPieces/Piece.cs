@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public abstract class Piece : MonoBehaviour
@@ -9,6 +10,9 @@ public abstract class Piece : MonoBehaviour
     private int _xBoard = -1;
     private int _yBoard = -1;
     private string _player;
+
+    private List<Vector2Int> _moveSquares;
+    private List<Vector2Int> _attackSquares;
     
     private void Start()
     {
@@ -31,11 +35,11 @@ public abstract class Piece : MonoBehaviour
         if (!game.IsGameOver() && game.GetCurrentPlayer() == _player)
         {
             game.DestroyMovePlates();  // Remove any existing move plates
-            InitiateMovePlates(); // Generate new move plates
+            AllLegalMoves(); // Generate new move plates
         }
     }
 
-    protected abstract void InitiateMovePlates();
+    public abstract void AllLegalMoves();
     
     public abstract King CanSeeKing();
 
@@ -70,6 +74,9 @@ public abstract class Piece : MonoBehaviour
     {
         return _yBoard;
     }
+
+    public abstract List<Vector2Int> GetMoveSquares();
+    public abstract List<Vector2Int> GetAttackSquares();
     
     public void SetXBoard(int x) { _xBoard = x; }
     public void SetYBoard(int y) { _yBoard = y; }

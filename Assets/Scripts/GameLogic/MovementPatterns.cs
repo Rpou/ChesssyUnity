@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public static class MovementPatterns
@@ -255,12 +256,72 @@ public static class MovementPatterns
     {
         foreach (var move in moveSquares)
         {
-            game.SpawnMovePlate(move.x, move.y, piece);
+            if (IsMoveSafe(move.x, move.y,piece, game))
+            {
+                game.SpawnMovePlate(move.x, move.y, piece);
+            }
         }
 
         foreach (var attack in attackSquares)
         {
-            game.SpawnAttackMovePlate(attack.x,attack.y, piece);
+            if (IsMoveSafe(attack.x, attack.y, piece, game))
+            {
+                game.SpawnAttackMovePlate(attack.x,attack.y, piece);
+            }
         }
     }
+    
+    private static bool IsMoveSafe(int x, int y, Piece piece, Game game)
+    {
+        if (game.GetPosition(x, y) == null) return true;
+        // Save the current board state
+        GameObject pieceOnAttackSquare = game.GetPosition(x, y);
+        GameObject pieceImGonnaMove = piece.gameObject;
+        int correctX = piece.GetxBoard();
+        int correctY = piece.GetyBoard();
+
+        // Simulate the move
+        game.SetPositionEmpty(correctX, correctY);
+
+        // If capturing a piece, temporarily remove it
+        if (pieceOnAttackSquare != null)
+        {
+            game.SetPositionEmpty(x, y); // Remove the opponent's piece for simulation
+        }
+
+        
+        piece.SetXBoard(x);
+        piece.SetYBoard(y);
+        piece.SetCoords();
+        game.SetPosition(pieceImGonnaMove);
+        
+        // Check if the king is now in check
+        King king = game.CheckIfKingInCheck(piece.GetPlayer());
+
+        // Restore the board state
+        game.SetPositionEmpty(x, y); // Remove our piece from the new location
+
+        // Restore the captured piece (if there was one)
+        if (pieceOnAttackSquare != null)
+        {
+            Piece pieceOnAttackSquarepiece = pieceOnAttackSquare.GetComponent<Piece>();
+            pieceOnAttackSquarepiece.SetXBoard(x);
+            pieceOnAttackSquarepiece.SetYBoard(y);
+            pieceOnAttackSquarepiece.SetCoords();
+            game.SetPosition(pieceOnAttackSquare); // Restore enemy piece
+        }
+
+        // Restore our piece back to the original spot
+       
+        piece.SetXBoard(correctX);
+        piece.SetYBoard(correctY);
+        piece.SetCoords();
+        game.SetPosition(piece.gameObject);
+        
+        if (king == null) return true;
+        return !king.GetInCheck(); // Move is only valid if the king is not in check
+    }
+
+
+
 }

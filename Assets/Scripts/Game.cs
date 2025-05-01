@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -102,6 +103,32 @@ public class Game : MonoBehaviour
             CreatePiece<Queen>("white_queen", matrixX, matrixY);
         }
     }
+    
+    public King CheckIfKingInCheck(string player)
+    {
+        List<GameObject> allPieces = new List<GameObject>();
+
+        allPieces.AddRange(player == "black" ? playerWhite : playerBlack);
+
+        // Check if any opponent piece can attack the king
+        foreach (var gameObjectPiece in allPieces)
+        {
+            if (gameObjectPiece == null) continue; // Skip if the piece is destroyed
+        
+            Piece piece = gameObjectPiece.GetComponent<Piece>();
+            King king = piece.CanSeeKing();
+
+            if (king != null)
+            {
+                king.SetInCheck(true);
+                Debug.Log($"{player} King is in Check by {piece.name}");
+                return king;
+            }
+        }
+        
+        return null;
+    }
+
 
     public void Winner(string playerWinner)
     {

@@ -4,21 +4,33 @@ using UnityEngine;
 
 public class Pawn : Piece
 {
-    protected override void InitiateMovePlates()
+    private List<Vector2Int> _moveSquares = new List<Vector2Int>();
+    private List<Vector2Int> _attackSquares = new List<Vector2Int>();
+    
+    public override void AllLegalMoves()
     {
-        (List<Vector2Int> moveSquares, List<Vector2Int> attackSquares) = MovementPatterns.GetPawnMoves(this, game);
+        (_moveSquares, _attackSquares) = MovementPatterns.GetPawnMoves(this, game);
 
-        MovementPatterns.SpawnAllMovePlates(moveSquares, attackSquares, this, game);
+        MovementPatterns.SpawnAllMovePlates(_moveSquares, _attackSquares, this, game);
     }
 
     public override King CanSeeKing()
     {
-        (List<Vector2Int> moveSquares, List<Vector2Int> attackSquares) = MovementPatterns.GetPawnMoves(this, game);
+        (_moveSquares, _attackSquares) = MovementPatterns.GetPawnMoves(this, game);
 
-        foreach (var attack in attackSquares)
+        foreach (var attack in _attackSquares)
         {
             if(game.GetPosition(attack.x, attack.y).GetComponent<Piece>() is King) return game.GetPosition(attack.x, attack.y).GetComponent<King>();
         }
         return null;
+    }
+
+    public override List<Vector2Int> GetMoveSquares()
+    {
+        return _moveSquares;
+    }
+    public override List<Vector2Int> GetAttackSquares()
+    {
+        return _attackSquares;
     }
 }

@@ -25,39 +25,38 @@ public class MovePlate : MonoBehaviour
         }
     }
 
-    public void OnMouseUp(){
+    public void OnMouseUp()
+    {
         controller = GameObject.FindGameObjectWithTag("GameController");
-        GameObject cp = controller.GetComponent<Game>().GetPosition(matrixX, matrixY);
-        
-        if(attack){
-            if(cp.name == "white_king") controller.GetComponent<Game>().Winner("black");
-            if(cp.name == "black_king") controller.GetComponent<Game>().Winner("white");
-            
+        Game game = controller.GetComponent<Game>();
+
+        GameObject cp = game.GetPosition(matrixX, matrixY);
+
+        if (attack)
+        {
+            if (cp.name == "white_king") game.Winner("black");
+            if (cp.name == "black_king") game.Winner("white");
             Destroy(cp);
         }
-        
-        Game game = controller.GetComponent<Game>();
+
         game.SetPositionEmpty(reference.GetComponent<Piece>().GetxBoard(), reference.GetComponent<Piece>().GetyBoard());
-        var piece = reference.GetComponent<Piece>();
-        
+
+        Piece piece = reference.GetComponent<Piece>();
         piece.SetXBoard(matrixX);
         piece.SetYBoard(matrixY);
         piece.SetCoords();
 
         game.SetPosition(reference);
-        cp = controller.GetComponent<Game>().GetPosition(matrixX, matrixY);
-        
-        game.CheckIfCreateQueenFromPawn(matrixX, matrixY,cp, game);
-        //inCheck = piece.CanSeeKing();
-        //if (inCheck)
-        //{
-          //  Debug.Log("King in check");
-        //}
-        
+        game.CheckIfCreateQueenFromPawn(matrixX, matrixY, reference, game);
+
+        // Check if **opponent’s** king is in check before switching turns
+        string opponent = game.GetCurrentPlayer() == "white" ? "black" : "white";
+        game.CheckIfKingInCheck(opponent);
+
         game.NextTurn();
-        
         game.DestroyMovePlates();
     }
+
 
     public void SetCoords(int x, int y){
         matrixX = x;
