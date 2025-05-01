@@ -126,6 +126,31 @@ public class Game : MonoBehaviour
             }
             return kingInCheck;
         }
+
+        if (player == "black")
+        {
+            foreach (var gameObject in playerWhite)
+            {
+                if (gameObject == null || !gameObject.activeSelf) continue; // Skip if the piece is destroyed
+                Piece piece = gameObject.GetComponent<Piece>();
+                if (piece is King king)
+                {
+                    king.SetInCheck(false);
+                }
+            }
+        }
+        else
+        {
+            foreach (var gameObject in playerBlack)
+            {
+                if (gameObject == null || !gameObject.activeSelf) continue; // Skip if the piece is destroyed
+                Piece piece = gameObject.GetComponent<Piece>();
+                if (piece is King king)
+                {
+                    king.SetInCheck(false);
+                }
+            }
+        }
         return null;
     }
 
