@@ -7,7 +7,6 @@ public class MovePlate : MonoBehaviour
 {
 
     public GameObject controller;
-    
 
     GameObject reference = null;
 
@@ -48,11 +47,11 @@ public class MovePlate : MonoBehaviour
 
         game.SetPosition(reference);
         game.CheckIfCreateQueenFromPawn(matrixX, matrixY, reference, game);
-
+        
         // Check if **opponent’s** king is in check before switching turns
         string opponent = game.GetCurrentPlayer() == "white" ? "black" : "white";
         game.CheckIfKingInCheck(opponent);
-
+        
         game.NextTurn();
         game.DestroyMovePlates();
     }

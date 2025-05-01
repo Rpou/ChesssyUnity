@@ -36,6 +36,7 @@ public class King : Piece
 
         GetComponent<SpriteRenderer>();
         _inCheck = false;
+        GetComponent<SpriteRenderer>().color = Color.white;
     }
     
     public override List<Vector2Int> GetMoveSquares()

@@ -18,7 +18,7 @@ public class Game : MonoBehaviour
 
     private string currentPlayer = "white";
     private bool gameOver = false;
-    
+
     void Start()
     {
         movePlate = Resources.Load<GameObject>("Objects/MovePlate");
@@ -33,26 +33,26 @@ public class Game : MonoBehaviour
         // Initialize white pieces
         playerWhite = new GameObject[]
         {
-            CreatePiece<Rook>("white_rook", 0, 0), CreatePiece<Knight>("white_knight", 1, 0), 
+            CreatePiece<Rook>("white_rook", 0, 0), CreatePiece<Knight>("white_knight", 1, 0),
             CreatePiece<Bishop>("white_bishop", 2, 0), CreatePiece<Queen>("white_queen", 3, 0),
-            CreatePiece<King>("white_king", 4, 0), CreatePiece<Bishop>("white_bishop", 5, 0), 
+            CreatePiece<King>("white_king", 4, 0), CreatePiece<Bishop>("white_bishop", 5, 0),
             CreatePiece<Knight>("white_knight", 6, 0), CreatePiece<Rook>("white_rook", 7, 0),
-            CreatePiece<Pawn>("white_pawn", 0, 1), CreatePiece<Pawn>("white_pawn", 1, 1), 
+            CreatePiece<Pawn>("white_pawn", 0, 1), CreatePiece<Pawn>("white_pawn", 1, 1),
             CreatePiece<Pawn>("white_pawn", 2, 1), CreatePiece<Pawn>("white_pawn", 3, 1),
-            CreatePiece<Pawn>("white_pawn", 4, 1), CreatePiece<Pawn>("white_pawn", 5, 1), 
+            CreatePiece<Pawn>("white_pawn", 4, 1), CreatePiece<Pawn>("white_pawn", 5, 1),
             CreatePiece<Pawn>("white_pawn", 6, 1), CreatePiece<Pawn>("white_pawn", 7, 1)
         };
 
         // Initialize black pieces
         playerBlack = new GameObject[]
         {
-            CreatePiece<Rook>("black_rook", 0, 7), CreatePiece<Knight>("black_knight", 1, 7), 
+            CreatePiece<Rook>("black_rook", 0, 7), CreatePiece<Knight>("black_knight", 1, 7),
             CreatePiece<Bishop>("black_bishop", 2, 7), CreatePiece<Queen>("black_queen", 3, 7),
-            CreatePiece<King>("black_king", 4, 7), CreatePiece<Bishop>("black_bishop", 5, 7), 
+            CreatePiece<King>("black_king", 4, 7), CreatePiece<Bishop>("black_bishop", 5, 7),
             CreatePiece<Knight>("black_knight", 6, 7), CreatePiece<Rook>("black_rook", 7, 7),
-            CreatePiece<Pawn>("black_pawn", 0, 6), CreatePiece<Pawn>("black_pawn", 1, 6), 
+            CreatePiece<Pawn>("black_pawn", 0, 6), CreatePiece<Pawn>("black_pawn", 1, 6),
             CreatePiece<Pawn>("black_pawn", 2, 6), CreatePiece<Pawn>("black_pawn", 3, 6),
-            CreatePiece<Pawn>("black_pawn", 4, 6), CreatePiece<Pawn>("black_pawn", 5, 6), 
+            CreatePiece<Pawn>("black_pawn", 4, 6), CreatePiece<Pawn>("black_pawn", 5, 6),
             CreatePiece<Pawn>("black_pawn", 6, 6), CreatePiece<Pawn>("black_pawn", 7, 6)
         };
     }
@@ -81,14 +81,14 @@ public class Game : MonoBehaviour
         piece.SetXBoard(x);
         piece.SetYBoard(y);
         piece.name = name;
-        
+
         // Set position in the board
         SetPosition(obj);
 
         return obj;
     }
-    
-    public void CheckIfCreateQueenFromPawn(int matrixX, int matrixY, GameObject cp, Game game) 
+
+    public void CheckIfCreateQueenFromPawn(int matrixX, int matrixY, GameObject cp, Game game)
     {
         var piece = cp.GetComponent<Piece>();
         if (matrixY == 0 && piece.name == "black_pawn")
@@ -103,8 +103,8 @@ public class Game : MonoBehaviour
             CreatePiece<Queen>("white_queen", matrixX, matrixY);
         }
     }
-    
-    public King CheckIfKingInCheck(string player)
+
+    public King CheckIfKingInCheck(string player, bool isSimulation = false)
     {
         List<GameObject> allPieces = new List<GameObject>();
 
@@ -113,19 +113,34 @@ public class Game : MonoBehaviour
         // Check if any opponent piece can attack the king
         foreach (var gameObjectPiece in allPieces)
         {
-            if (gameObjectPiece == null) continue; // Skip if the piece is destroyed
-        
-            Piece piece = gameObjectPiece.GetComponent<Piece>();
-            King king = piece.CanSeeKing();
+            if (gameObjectPiece == null || !gameObjectPiece.activeSelf) continue; // Skip if the piece is destroyed
 
-            if (king != null)
+            Piece piece = gameObjectPiece.GetComponent<Piece>();
+            King kingInCheck = piece.CanSeeKing();
+
+            if (kingInCheck == null) continue;
+            if (!isSimulation)
             {
-                king.SetInCheck(true);
+                kingInCheck.SetInCheck(true); 
                 Debug.Log($"{player} King is in Check by {piece.name}");
-                return king;
             }
+            return kingInCheck;
         }
-        
+        return null;
+    }
+
+    public King CheckIfKingOutOfCheck(string player)
+    {
+        List<GameObject> allPieces = new List<GameObject>();
+
+        allPieces.AddRange(player == "black" ? playerBlack : playerWhite);
+        foreach (var gameObjectPiece in allPieces)
+        {
+            if (gameObjectPiece == null) continue; // Skip if the piece is destroyed
+
+            Piece piece = gameObjectPiece.GetComponent<Piece>();
+            piece.AllLegalMoves();
+        }
         return null;
     }
 
@@ -138,8 +153,8 @@ public class Game : MonoBehaviour
             Console.WriteLine("ur dumb lol");
         }
         GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<TextMeshProUGUI>().enabled = true;
-        GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<TextMeshProUGUI>().text = playerWinner +" is the winner";
-        
+        GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<TextMeshProUGUI>().text = playerWinner + " is the winner";
+
         GameObject.FindGameObjectWithTag("RestartTag").GetComponent<TextMeshProUGUI>().enabled = true;
     }
 
@@ -149,7 +164,8 @@ public class Game : MonoBehaviour
     /// <param name="matrixX">The x coordinate</param>
     /// <param name="matrixY">The y coordinate</param>
     /// <param name="piece">The piece in question</param>
-    public void SpawnMovePlate(int matrixX, int matrixY, Piece piece){
+    public void SpawnMovePlate(int matrixX, int matrixY, Piece piece)
+    {
         float x = matrixX;
         float y = matrixY;
 
@@ -159,15 +175,16 @@ public class Game : MonoBehaviour
         x += -2.3f;
         y += -2.3f;
 
-        GameObject mp = Instantiate(movePlate, new Vector3(x,y,-3.0f), Quaternion.identity);
+        GameObject mp = Instantiate(movePlate, new Vector3(x, y, -3.0f), Quaternion.identity);
 
         MovePlate mpScript = mp.GetComponent<MovePlate>();
         mpScript.SetReference(piece.gameObject);
         mpScript.SetCoords(matrixX, matrixY);
 
     }
-    
-    public void SpawnAttackMovePlate(int matrixX, int matrixY, Piece piece){
+
+    public void SpawnAttackMovePlate(int matrixX, int matrixY, Piece piece)
+    {
         float x = matrixX;
         float y = matrixY;
 
@@ -177,14 +194,14 @@ public class Game : MonoBehaviour
         x += -2.3f;
         y += -2.3f;
 
-        GameObject mp = Instantiate(movePlate, new Vector3(x,y,-3.0f), Quaternion.identity);
+        GameObject mp = Instantiate(movePlate, new Vector3(x, y, -3.0f), Quaternion.identity);
 
         MovePlate mpScript = mp.GetComponent<MovePlate>();
         mpScript.attack = true;
         mpScript.SetReference(piece.gameObject);
         mpScript.SetCoords(matrixX, matrixY);
     }
-    
+
     public bool PositionOnBoard(int x, int y)
     {
         return x >= 0 && y >= 0 && x < positions.GetLength(0) && y < positions.GetLength(1);
@@ -192,34 +209,38 @@ public class Game : MonoBehaviour
     public void DestroyMovePlates()
     {
         GameObject[] movePlates = GameObject.FindGameObjectsWithTag("MovePlate");
-        for(int i = 0; i < movePlates.Length; i++){
+        for (int i = 0; i < movePlates.Length; i++)
+        {
             Destroy(movePlates[i]);
         }
     }
-    
-    
-    public void SetPosition(GameObject obj){
+
+
+    public void SetPosition(GameObject obj)
+    {
         Piece piece = obj.GetComponent<Piece>();
 
         positions[piece.GetxBoard(), piece.GetyBoard()] = obj;
     }
 
-    public void SetPositionEmpty(int x, int y){
-        positions[x,y] = null;
+    public void SetPositionEmpty(int x, int y)
+    {
+        positions[x, y] = null;
     }
 
-    public GameObject GetPosition(int x, int y){
-        return positions[x,y];
+    public GameObject GetPosition(int x, int y)
+    {
+        return positions[x, y];
     }
 
-    
+
     public string GetCurrentPlayer()
-     {
-         return currentPlayer;
-     }
- 
-     public bool IsGameOver()
-     {
-         return gameOver;
-     }
+    {
+        return currentPlayer;
+    }
+
+    public bool IsGameOver()
+    {
+        return gameOver;
+    }
 }

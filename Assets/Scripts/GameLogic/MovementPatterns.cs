@@ -273,7 +273,6 @@ public static class MovementPatterns
     
     private static bool IsMoveSafe(int x, int y, Piece piece, Game game)
     {
-        if (game.GetPosition(x, y) == null) return true;
         // Save the current board state
         GameObject pieceOnAttackSquare = game.GetPosition(x, y);
         GameObject pieceImGonnaMove = piece.gameObject;
@@ -287,8 +286,8 @@ public static class MovementPatterns
         if (pieceOnAttackSquare != null)
         {
             game.SetPositionEmpty(x, y); // Remove the opponent's piece for simulation
+            pieceOnAttackSquare.SetActive(false);
         }
-
         
         piece.SetXBoard(x);
         piece.SetYBoard(y);
@@ -296,8 +295,8 @@ public static class MovementPatterns
         game.SetPosition(pieceImGonnaMove);
         
         // Check if the king is now in check
-        King king = game.CheckIfKingInCheck(piece.GetPlayer());
-
+        King king = game.CheckIfKingInCheck(piece.GetPlayer(), true);
+        
         // Restore the board state
         game.SetPositionEmpty(x, y); // Remove our piece from the new location
 
@@ -308,6 +307,7 @@ public static class MovementPatterns
             pieceOnAttackSquarepiece.SetXBoard(x);
             pieceOnAttackSquarepiece.SetYBoard(y);
             pieceOnAttackSquarepiece.SetCoords();
+            pieceOnAttackSquare.SetActive(true);
             game.SetPosition(pieceOnAttackSquare); // Restore enemy piece
         }
 
@@ -317,9 +317,8 @@ public static class MovementPatterns
         piece.SetYBoard(correctY);
         piece.SetCoords();
         game.SetPosition(piece.gameObject);
-        
-        if (king == null) return true;
-        return !king.GetInCheck(); // Move is only valid if the king is not in check
+
+        return king == null;
     }
 
 
