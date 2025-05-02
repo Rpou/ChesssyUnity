@@ -5,6 +5,7 @@ using UnityEngine;
 public class King : Piece
 {
     public bool _inCheck;
+    private bool _hasMoved;
     private List<Vector2Int> _moveSquares = new List<Vector2Int>();
     private List<Vector2Int> _attackSquares = new List<Vector2Int>();
     
@@ -46,5 +47,15 @@ public class King : Piece
     public override List<Vector2Int> GetAttackSquares()
     {
         return _attackSquares;
+    }
+
+    public void ChangeHasMoved(bool hasMoved)
+    {
+        _hasMoved = hasMoved;
+    }
+
+    public bool GetHasMoved()
+    {
+        return _hasMoved;
     }
 }

@@ -24,10 +24,11 @@ public class MovePlate : MonoBehaviour
         }
     }
 
+    // worst case: 48 + 138 + 16 = 202
     public void OnMouseUp()
     {
         controller = GameObject.FindGameObjectWithTag("GameController");
-        Game game = controller.GetComponent<Game>();
+        Game game = controller.GetComponent<Game>(); 
 
         GameObject cp = game.GetPosition(matrixX, matrixY);
 
@@ -38,9 +39,13 @@ public class MovePlate : MonoBehaviour
             Destroy(cp);
         }
 
-        game.SetPositionEmpty(reference.GetComponent<Piece>().GetxBoard(), reference.GetComponent<Piece>().GetyBoard());
+        var beforeMoveX = reference.GetComponent<Piece>().GetxBoard();
+        var beforeMoveY = reference.GetComponent<Piece>().GetyBoard();
+
+        game.SetPositionEmpty(beforeMoveX, beforeMoveY);
 
         Piece piece = reference.GetComponent<Piece>();
+        if (piece is King movedKing) movedKing.ChangeHasMoved(true); 
         piece.SetXBoard(matrixX);
         piece.SetYBoard(matrixY);
         piece.SetCoords();
@@ -50,10 +55,15 @@ public class MovePlate : MonoBehaviour
         
         // Check if **opponent’s** king is in check before switching turns
         string opponent = game.GetCurrentPlayer() == "white" ? "black" : "white";
-        game.CheckIfKingInCheck(opponent);
+        King king = game.CheckIfKingInCheck(opponent); // 48
+        
+        var move = game.CreateNotation(piece, beforeMoveX, beforeMoveY, 
+            matrixX, matrixY, king != null, attack); // 138
+        game.AddMove(move); 
+        Debug.Log(move);
         
         game.NextTurn();
-        game.DestroyMovePlates();
+        game.DestroyMovePlates(); // 16
     }
 
 

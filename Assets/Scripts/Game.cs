@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -15,12 +16,15 @@ public class Game : MonoBehaviour
     private GameObject[,] positions = new GameObject[8, 8];
     public GameObject[] playerBlack = new GameObject[16];
     public GameObject[] playerWhite = new GameObject[16];
+    private Vector2Int? enPassantTarget;
 
+    private ArrayList moves;
     private string currentPlayer = "white";
     private bool gameOver = false;
 
     void Start()
     {
+        moves = new ArrayList();
         movePlate = Resources.Load<GameObject>("Objects/MovePlate");
         chessPiece = Resources.Load<GameObject>("Objects/ChessPiece");
         // Load the SpriteManager from Resources
@@ -104,11 +108,12 @@ public class Game : MonoBehaviour
         }
     }
 
-    public King CheckIfKingInCheck(string player, bool isSimulation = false)
+    // worst case: 16 + 16 + 16 = 48
+    public King CheckIfKingInCheck(string opponent, bool isSimulation = false)
     {
         List<GameObject> allPieces = new List<GameObject>();
 
-        allPieces.AddRange(player == "black" ? playerWhite : playerBlack);
+        allPieces.AddRange(opponent == "black" ? playerWhite : playerBlack);
 
         // Check if any opponent piece can attack the king
         foreach (var gameObjectPiece in allPieces)
@@ -122,12 +127,12 @@ public class Game : MonoBehaviour
             if (!isSimulation)
             {
                 kingInCheck.SetInCheck(true); 
-                Debug.Log($"{player} King is in Check by {piece.name}");
+                Debug.Log($"{opponent} King is in Check by {piece.name}");
             }
             return kingInCheck;
         }
 
-        if (player == "black")
+        if (opponent == "black")
         {
             foreach (var gameObject in playerWhite)
             {
@@ -153,22 +158,6 @@ public class Game : MonoBehaviour
         }
         return null;
     }
-
-    public King CheckIfKingOutOfCheck(string player)
-    {
-        List<GameObject> allPieces = new List<GameObject>();
-
-        allPieces.AddRange(player == "black" ? playerBlack : playerWhite);
-        foreach (var gameObjectPiece in allPieces)
-        {
-            if (gameObjectPiece == null) continue; // Skip if the piece is destroyed
-
-            Piece piece = gameObjectPiece.GetComponent<Piece>();
-            piece.AllLegalMoves();
-        }
-        return null;
-    }
-
 
     public void Winner(string playerWinner)
     {
@@ -231,6 +220,8 @@ public class Game : MonoBehaviour
     {
         return x >= 0 && y >= 0 && x < positions.GetLength(0) && y < positions.GetLength(1);
     }
+    
+    // worst case: 16
     public void DestroyMovePlates()
     {
         GameObject[] movePlates = GameObject.FindGameObjectsWithTag("MovePlate");
@@ -240,6 +231,134 @@ public class Game : MonoBehaviour
         }
     }
 
+    // worst case: (132) + 6(string made)
+    public string CreateNotation(Piece piece, int xPositionBefore, int yPositionBefore, int xPositionAfter, 
+        int yPositionAfter, bool putInCheck, bool killedPiece)
+    {
+        var letterOfSquareMovedTo = ConvertNrToChar(xPositionAfter + 1).ToString();
+        var letterOfSquareBeforeMove = ConvertNrToChar(xPositionBefore + 1);
+        var overlap = LegalMovesOverlapSameTypePiece(piece);
+        
+        var result = "";
+        if (killedPiece) result += "x";
+        if (piece is Pawn)
+        {
+            if (killedPiece) result = letterOfSquareBeforeMove + result + letterOfSquareMovedTo + (yPositionAfter+1);
+            else result = letterOfSquareMovedTo + result + (yPositionAfter+1);
+        }
+
+        if (piece is Knight)
+        {
+            if (overlap) result = "N" + letterOfSquareBeforeMove + (yPositionBefore+1) + result + letterOfSquareMovedTo + (yPositionAfter+1);
+            else result = "N" + result + letterOfSquareMovedTo + (yPositionAfter+1);
+        }
+
+        if (piece is Bishop)
+        {
+            result = "B" + result + letterOfSquareMovedTo + (yPositionAfter+1);
+        }
+
+        if (piece is Rook)
+        {
+            if (overlap) result = "R" + letterOfSquareBeforeMove + (yPositionBefore+1) + result + letterOfSquareMovedTo + (yPositionAfter+1);
+            result = "R" + result + letterOfSquareMovedTo + (yPositionAfter+1);
+        }
+
+        if (piece is Queen)
+        {
+            if (overlap) result = "Q" + letterOfSquareBeforeMove + (yPositionBefore+1) + result + letterOfSquareMovedTo + (yPositionAfter+1);
+            result = "Q" + result + letterOfSquareMovedTo + (yPositionAfter+1);
+        }
+
+        if (piece is King)
+        {
+            result = "K" + result + letterOfSquareMovedTo + (yPositionAfter+1);
+        }
+        
+        if (putInCheck) result += "+";
+        return result;
+    }
+
+    // worst case: 16 + (116) = 132
+    private bool LegalMovesOverlapSameTypePiece(Piece pieceType)
+    {
+        var player = GetCurrentPlayer();
+        List<GameObject> allPieces = new List<GameObject>();
+        allPieces.AddRange(player == "black" ? playerBlack : playerWhite);
+        
+        if (pieceType is Knight)
+        {
+            return LegalMovesOverlap<Knight>(allPieces);
+        }
+
+        if (pieceType is Rook)
+        {
+            return LegalMovesOverlap<Rook>(allPieces);
+        }
+
+        if (pieceType is Queen)
+        {
+            return LegalMovesOverlap<Queen>(allPieces);
+        }
+
+        return false;
+    }
+
+    // worst case: 16 + 10 * 10 = 116 
+    private bool LegalMovesOverlap<T>(List<GameObject> allPieces) where T : Piece
+    {
+        Piece piece1 = null;
+        Piece piece2 = null;
+        foreach (var gameObject in allPieces)
+        {
+            if (gameObject == null) continue;
+            Piece piece = gameObject.GetComponent<Piece>();
+            if (piece is T matchedPiece && piece1 == null)
+            {
+                piece1 = matchedPiece;
+            }
+            else if (piece is T matchedPiece2)
+            {
+                piece2 = matchedPiece2;
+            }
+
+            if (piece1 != null && piece2 != null)
+            {
+                var moves1 = piece1.GetMoveSquares();
+                var attacks1 = piece1.GetMoveSquares();
+                var moves2 = piece2.GetMoveSquares();
+                var attacks2 = piece2.GetMoveSquares();
+
+                foreach (var move1 in moves1)
+                {
+                    foreach (var move2 in moves2)
+                    {
+                        if (move1 == move2) return true;
+                    }
+                }
+                    
+                foreach (var attack1 in attacks1)
+                {
+                    foreach (var attack2 in attacks2)
+                    {
+                        if (attack1 == attack2) return true;
+                    }
+                }
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Converts a nr to a letter based  on ASCII
+    /// </summary>
+    /// <param name="number"></param>
+    /// <returns></returns>
+    private char ConvertNrToChar(int number)
+    {
+        return (char)('a' + number - 1);
+    }
 
     public void SetPosition(GameObject obj)
     {
@@ -267,5 +386,10 @@ public class Game : MonoBehaviour
     public bool IsGameOver()
     {
         return gameOver;
+    }
+
+    public void AddMove(string move)
+    {
+        moves.Add(move);
     }
 }
