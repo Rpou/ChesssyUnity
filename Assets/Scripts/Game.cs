@@ -321,9 +321,11 @@ public class Game : MonoBehaviour
             {
                 piece2 = matchedPiece2;
             }
+            Debug.Log("somethign is happening");
 
             if (piece1 != null && piece2 != null)
             {
+                Debug.Log("I am inside if -- I WANT TO BE HERE");
                 var moves1 = piece1.GetMoveSquares();
                 var attacks1 = piece1.GetMoveSquares();
                 var moves2 = piece2.GetMoveSquares();
@@ -333,6 +335,7 @@ public class Game : MonoBehaviour
                 {
                     foreach (var move2 in moves2)
                     {
+                        Debug.Log("Move1: " + move1 + " move2: " + move2);
                         if (move1 == move2) return true;
                     }
                 }
