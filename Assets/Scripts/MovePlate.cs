@@ -24,7 +24,7 @@ public class MovePlate : MonoBehaviour
         }
     }
 
-    // worst case: 48 + 138 + 16 = 202
+    // worst case: 48 + 202 + 16 = 266
     public void OnMouseUp()
     {
         controller = GameObject.FindGameObjectWithTag("GameController");
@@ -58,7 +58,7 @@ public class MovePlate : MonoBehaviour
         King king = game.CheckIfKingInCheck(opponent); // 48
         
         var move = game.CreateNotation(piece, beforeMoveX, beforeMoveY, 
-            matrixX, matrixY, king != null, attack); // 138
+            matrixX, matrixY, king != null, attack); // 202
         game.AddMove(move); 
         Debug.Log(move);
         

@@ -231,7 +231,7 @@ public class Game : MonoBehaviour
         }
     }
 
-    // worst case: (132) + 6(string made)
+    // worst case: (196) + 6(string made) = 202
     public string CreateNotation(Piece piece, int xPositionBefore, int yPositionBefore, int xPositionAfter, 
         int yPositionAfter, bool putInCheck, bool killedPiece)
     {
@@ -279,7 +279,7 @@ public class Game : MonoBehaviour
         return result;
     }
 
-    // worst case: 16 + (116) = 132
+    // worst case: 16 + (180) = 196
     private bool LegalMovesOverlapSameTypePiece(Piece pieceType)
     {
         var player = GetCurrentPlayer();
@@ -304,7 +304,7 @@ public class Game : MonoBehaviour
         return false;
     }
 
-    // worst case: 16 + 10 * 10 = 116 
+    // worst case: 16 + 10 * 10 + 8 * 8 = 180
     private bool LegalMovesOverlap<T>(List<GameObject> allPieces) where T : Piece
     {
         Piece piece1 = null;
