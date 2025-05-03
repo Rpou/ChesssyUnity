@@ -233,12 +233,13 @@ public class Game : MonoBehaviour
 
     // worst case: (196) + 6(string made) = 202
     public string CreateNotation(Piece piece, int xPositionBefore, int yPositionBefore, int xPositionAfter, 
-        int yPositionAfter, bool killedPiece)
+        int yPositionAfter, bool putInCheck, bool killedPiece)
     {
-        // Check if **opponent’s** king is in check before switching turns
-        string opponent = GetCurrentPlayer() == "white" ? "black" : "white";
-        King king = CheckIfKingInCheck(opponent); // 48
-        var putInCheck = king != null;
+        
+        piece.SetXBoard(xPositionBefore);
+        piece.SetYBoard(yPositionBefore);
+        piece.SetCoords();
+        SetPosition(piece.gameObject);
         
         var letterOfSquareMovedTo = ConvertNrToChar(xPositionAfter + 1).ToString();
         var letterOfSquareBeforeMove = ConvertNrToChar(xPositionBefore + 1);
@@ -250,6 +251,8 @@ public class Game : MonoBehaviour
         {
             if (killedPiece) result = letterOfSquareBeforeMove + result + letterOfSquareMovedTo + (yPositionAfter+1);
             else result = letterOfSquareMovedTo + result + (yPositionAfter+1);
+            if ((GetCurrentPlayer() == "white" && xPositionAfter == 7) ||
+                (GetCurrentPlayer() == "black" && xPositionAfter == 0)) result += "Q";
         }
 
         if (piece is Knight)
@@ -281,6 +284,13 @@ public class Game : MonoBehaviour
         }
         
         if (putInCheck) result += "+";
+        
+        SetPositionEmpty(xPositionBefore, yPositionBefore); // Remove our piece from the new location
+        piece.SetXBoard(xPositionAfter);
+        piece.SetYBoard(yPositionAfter);
+        piece.SetCoords();
+        SetPosition(piece.gameObject);
+        
         return result;
     }
 
