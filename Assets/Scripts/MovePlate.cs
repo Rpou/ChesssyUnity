@@ -59,7 +59,8 @@ public class MovePlate : MonoBehaviour
         
         var move = game.CreateNotation(piece, beforeMoveX, beforeMoveY, 
             matrixX, matrixY, king != null, attack); // 202
-        game.AddMove(move); 
+        game.AddMove(move);
+        GameObject.Find("SidePanelController").GetComponent<GameLogScript>().LogMove(game);
         Debug.Log(move);
         
         game.NextTurn();

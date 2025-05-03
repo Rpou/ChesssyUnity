@@ -18,13 +18,13 @@ public class Game : MonoBehaviour
     public GameObject[] playerWhite = new GameObject[16];
     private Vector2Int? enPassantTarget;
 
-    private ArrayList moves;
+    private List<string> moves;
     private string currentPlayer = "white";
     private bool gameOver = false;
 
     void Start()
     {
-        moves = new ArrayList();
+        moves = new List<string>();
         movePlate = Resources.Load<GameObject>("Objects/MovePlate");
         chessPiece = Resources.Load<GameObject>("Objects/ChessPiece");
         // Load the SpriteManager from Resources
@@ -394,5 +394,10 @@ public class Game : MonoBehaviour
     public void AddMove(string move)
     {
         moves.Add(move);
+    }
+
+    public List<string> GetMoves()
+    {
+        return moves;
     }
 }

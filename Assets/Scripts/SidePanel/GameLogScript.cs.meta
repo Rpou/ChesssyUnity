@@ -1,0 +1,13 @@
+fileFormatVersion: 2
+guid: 3c1a1e003bff0c247a36aa4e6d7d804e
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - moveRowPrefab: {instanceID: 0}
+  - moveContentParent: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
