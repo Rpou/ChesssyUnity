@@ -5,16 +5,10 @@ public class Rook : Piece
 {
     private List<Vector2Int> _moveSquares = new List<Vector2Int>();
     private List<Vector2Int> _attackSquares = new List<Vector2Int>();
-    public override void AllLegalMoves()
-    {
-        (_moveSquares, _attackSquares) = MovementPatterns.GetRookMoves(this, game);
-
-        MovementPatterns.SpawnAllMovePlates(_moveSquares, _attackSquares, this, game);
-    }
     
     public override King CanSeeKing()
     {
-        (List<Vector2Int> moveSquares, List<Vector2Int> attackSquares) = MovementPatterns.GetRookMoves(this, game);
+        (List<Vector2Int> moveSquares, List<Vector2Int> attackSquares) = MovementPatterns.GetPieceMoves(this, game);
         
         foreach (var attack in attackSquares)
         {
@@ -23,10 +17,6 @@ public class Rook : Piece
         return null;
     }
     
-    public override (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetPossibleMoves()
-    {
-        return MovementPatterns.GetRookMoves(this, game);
-    }
     
     public override List<Vector2Int> GetMoveSquares()
     {

@@ -35,11 +35,15 @@ public abstract class Piece : MonoBehaviour
         if (!game.IsGameOver() && game.GetCurrentPlayer() == _player)
         {
             game.DestroyMovePlates();  // Remove any existing move plates
-            AllLegalMoves(); // Generate new move plates
+            AllLegalMovesSpawnMovePlate(); // Generate new move plates
         }
     }
 
-    public abstract void AllLegalMoves();
+    public void AllLegalMovesSpawnMovePlate()
+    {
+        (_moveSquares, _attackSquares) = MovementPatterns.GetPieceMoves(this, game);
+        MovementPatterns.SpawnAllMovePlates(_moveSquares, _attackSquares, this, game);
+    }
     
     public abstract King CanSeeKing();
 
@@ -74,8 +78,23 @@ public abstract class Piece : MonoBehaviour
     {
         return _yBoard;
     }
-    
-    public abstract (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetPossibleMoves();
+
+    public (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetAllLegalMoves()
+    {
+        (_moveSquares, _attackSquares) = MovementPatterns.GetPieceMoves(this, game);
+        var legalMoveableSquares = new List<Vector2Int>();
+        var legalAttackableSquares = new List<Vector2Int>();
+        foreach (var move in _moveSquares)
+        {
+            if (MovementPatterns.IsMoveSafe(move.x, move.y, this, game)) legalMoveableSquares.Add(move);
+        }
+        foreach (var attack in _attackSquares)
+        {
+            if (MovementPatterns.IsMoveSafe(attack.x, attack.y, this, game)) legalAttackableSquares.Add(attack);
+        }
+
+        return (legalMoveableSquares, legalAttackableSquares);
+    }
 
     public abstract List<Vector2Int> GetMoveSquares();
     public abstract List<Vector2Int> GetAttackSquares();

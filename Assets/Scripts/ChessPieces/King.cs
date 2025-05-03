@@ -9,13 +9,6 @@ public class King : Piece
     private List<Vector2Int> _moveSquares = new List<Vector2Int>();
     private List<Vector2Int> _attackSquares = new List<Vector2Int>();
     
-    public override void AllLegalMoves()
-    {
-        (_moveSquares, _attackSquares) = MovementPatterns.GetKingMoves(this, game);
-
-        MovementPatterns.SpawnAllMovePlates(_moveSquares, _attackSquares, this, game);
-    }
-    
     public override King CanSeeKing()
     {
         return null;
@@ -40,10 +33,6 @@ public class King : Piece
         GetComponent<SpriteRenderer>().color = Color.white;
     }
     
-    public override (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetPossibleMoves()
-    {
-        return MovementPatterns.GetKingMoves(this, game);
-    }
     
     public override List<Vector2Int> GetMoveSquares()
     {

@@ -85,9 +85,21 @@ public static class MovementPatterns
 
         return (movableSquares, attackableSquares);
     }
+
+    public static (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares)
+        GetPieceMoves(Piece piece, Game game)
+    {
+        if (piece is Pawn pawn) return GetPawnMoves(pawn, game);
+        if (piece is Knight knight) return GetKnightMoves(knight, game);
+        if (piece is Bishop bishop) return GetBishopMoves(bishop, game);
+        if (piece is Rook rook) return GetRookMoves(rook, game);
+        if (piece is Queen queen) return GetQueenMoves(queen, game);
+        return GetKingMoves((King)piece, game);
+        
+    }
     
     // King
-    public static (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) 
+    private static (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) 
         GetKingMoves(Piece piece, Game game)
     {
         var moveSquares = new List<Vector2Int>();
@@ -117,7 +129,7 @@ public static class MovementPatterns
 
     
     // Queen
-    public static (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) 
+    private static (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) 
         GetQueenMoves(Piece piece, Game game)
     {
         var moveSquares = new List<Vector2Int>();
@@ -139,7 +151,7 @@ public static class MovementPatterns
     }
 
     // Rook
-    public static (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) 
+    private static (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) 
         GetRookMoves(Piece piece, Game game)
     {
         var moveSquares = new List<Vector2Int>();
@@ -160,7 +172,7 @@ public static class MovementPatterns
     }
 
     // Bishop 
-    public static (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) 
+    private static (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) 
         GetBishopMoves(Piece piece, Game game)
     {
         var moveSquares = new List<Vector2Int>();
@@ -181,7 +193,7 @@ public static class MovementPatterns
     }
 
     // Knight 
-    public static (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) 
+    private static (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) 
         GetKnightMoves(Piece piece, Game game)
     {
         var moveSquares = new List<Vector2Int>();
@@ -211,7 +223,7 @@ public static class MovementPatterns
 
     
     // Pawn
-    public static (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares)  
+    private static (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares)  
         GetPawnMoves(Piece piece, Game game)
     {
         var moveSquares = new List<Vector2Int>();
@@ -266,10 +278,11 @@ public static class MovementPatterns
     {
         foreach (var move in moveSquares)
         {
-            if (IsMoveSafe(move.x, move.y,piece, game))
+            if (IsMoveSafe(move.x, move.y, piece, game))
             {
                 game.SpawnMovePlate(move.x, move.y, piece);
             }
+            
         }
 
         foreach (var attack in attackSquares)
@@ -278,10 +291,11 @@ public static class MovementPatterns
             {
                 game.SpawnAttackMovePlate(attack.x,attack.y, piece);
             }
+            
         }
     }
     
-    private static bool IsMoveSafe(int x, int y, Piece piece, Game game)
+    public static bool IsMoveSafe(int x, int y, Piece piece, Game game)
     {
         // Save the current board state
         GameObject pieceOnAttackSquare = game.GetPosition(x, y);

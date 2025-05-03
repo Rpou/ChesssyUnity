@@ -159,6 +159,24 @@ public class Game : MonoBehaviour
         return null;
     }
 
+    public bool IsCheckMate(string opponent)
+    {
+        List<GameObject> allPieces = new List<GameObject>();
+
+        allPieces.AddRange(opponent == "black" ? playerBlack : playerWhite);
+
+        // Check if any opponent piece can attack the king
+        foreach (var gameObject in allPieces)
+        {
+            Piece piece = gameObject.GetComponent<Piece>();
+            (List<Vector2Int> pieceMoves, List<Vector2Int> pieceAttacks) = piece.GetAllLegalMoves();
+            Debug.Log("movecout: " + pieceMoves.Count +  " PieceAttack: " + pieceAttacks.Count);
+            if (pieceMoves.Count != 0 || pieceAttacks.Count != 0) return false;
+        }
+
+        return true;
+    }
+
     public void Winner(string playerWinner)
     {
         gameOver = true;
@@ -340,9 +358,9 @@ public class Game : MonoBehaviour
             if (piece1 != null && piece2 != null)
             {
                 (List<Vector2Int> moves1, List<Vector2Int> attacks1)
-                    = piece1.GetPossibleMoves();
+                    = piece1.GetAllLegalMoves();
                 (List<Vector2Int> moves2, List<Vector2Int> attacks2) 
-                    = piece2.GetPossibleMoves();
+                    = piece2.GetAllLegalMoves();
 
                 foreach (var move1 in moves1)
                 {

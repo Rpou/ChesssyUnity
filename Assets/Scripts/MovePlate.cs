@@ -47,8 +47,6 @@ public class MovePlate : MonoBehaviour
             }
             catch
             {
-                if (cp.name == "white_king") game.Winner("black");
-                if (cp.name == "black_king") game.Winner("white");
                 Destroy(cp);
             }
         }
@@ -74,6 +72,14 @@ public class MovePlate : MonoBehaviour
             matrixX, matrixY, putInCheck, attack); // 202
         game.AddMove(move);
         GameObject.Find("SidePanelController").GetComponent<GameLogScript>().LogMove(game);
+
+        if (putInCheck)
+        {
+            Debug.Log("HE IS IN CHECK");
+            var isCheckMate = game.IsCheckMate(opponent);
+            Debug.Log("IS IT CHECKMATE: " + isCheckMate);
+            if (isCheckMate) game.Winner(game.GetCurrentPlayer());
+        }
         
         game.NextTurn();
         game.DestroyMovePlates(); // 16
