@@ -74,6 +74,8 @@ public abstract class Piece : MonoBehaviour
     {
         return _yBoard;
     }
+    
+    public abstract (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetPossibleMoves();
 
     public abstract List<Vector2Int> GetMoveSquares();
     public abstract List<Vector2Int> GetAttackSquares();

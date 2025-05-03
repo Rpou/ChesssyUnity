@@ -29,6 +29,11 @@ public class Pawn : Piece
         return null;
     }
 
+    public override (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetPossibleMoves()
+    {
+        return MovementPatterns.GetPawnMoves(this, game);
+    }
+
     public override List<Vector2Int> GetMoveSquares()
     {
         return _moveSquares;

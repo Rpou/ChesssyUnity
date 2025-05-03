@@ -330,7 +330,5 @@ public static class MovementPatterns
 
         return king == null;
     }
-
-
-
+    
 }

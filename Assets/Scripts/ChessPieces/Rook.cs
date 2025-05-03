@@ -23,6 +23,11 @@ public class Rook : Piece
         return null;
     }
     
+    public override (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetPossibleMoves()
+    {
+        return MovementPatterns.GetRookMoves(this, game);
+    }
+    
     public override List<Vector2Int> GetMoveSquares()
     {
         return _moveSquares;

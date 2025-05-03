@@ -24,7 +24,7 @@ public class MovePlate : MonoBehaviour
         }
     }
 
-    // worst case: 48 + 202 + 16 = 266
+    // worst case: 250 + 16 = 266
     public void OnMouseUp()
     {
         controller = GameObject.FindGameObjectWithTag("GameController");
@@ -45,6 +45,11 @@ public class MovePlate : MonoBehaviour
         game.SetPositionEmpty(beforeMoveX, beforeMoveY);
 
         Piece piece = reference.GetComponent<Piece>();
+        var move = game.CreateNotation(piece, beforeMoveX, beforeMoveY, 
+            matrixX, matrixY, attack); // 250
+        game.AddMove(move);
+        GameObject.Find("SidePanelController").GetComponent<GameLogScript>().LogMove(game);
+        
         if (piece is King movedKing) movedKing.ChangeHasMoved(true); 
         if (piece is Pawn pawn && Math.Abs(beforeMoveY - matrixY) == 2) game.SetEnPassantTarget(pawn);
         piece.SetXBoard(matrixX);
@@ -53,18 +58,6 @@ public class MovePlate : MonoBehaviour
 
         game.SetPosition(reference);
         game.CheckIfCreateQueenFromPawn(matrixX, matrixY, reference, game);
-        
-        
-        
-        // Check if **opponent’s** king is in check before switching turns
-        string opponent = game.GetCurrentPlayer() == "white" ? "black" : "white";
-        King king = game.CheckIfKingInCheck(opponent); // 48
-        
-        var move = game.CreateNotation(piece, beforeMoveX, beforeMoveY, 
-            matrixX, matrixY, king != null, attack); // 202
-        game.AddMove(move);
-        GameObject.Find("SidePanelController").GetComponent<GameLogScript>().LogMove(game);
-        Debug.Log(move);
         
         game.NextTurn();
         game.DestroyMovePlates(); // 16

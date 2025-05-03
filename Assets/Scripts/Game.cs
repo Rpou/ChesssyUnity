@@ -233,8 +233,13 @@ public class Game : MonoBehaviour
 
     // worst case: (196) + 6(string made) = 202
     public string CreateNotation(Piece piece, int xPositionBefore, int yPositionBefore, int xPositionAfter, 
-        int yPositionAfter, bool putInCheck, bool killedPiece)
+        int yPositionAfter, bool killedPiece)
     {
+        // Check if **opponent’s** king is in check before switching turns
+        string opponent = GetCurrentPlayer() == "white" ? "black" : "white";
+        King king = CheckIfKingInCheck(opponent); // 48
+        var putInCheck = king != null;
+        
         var letterOfSquareMovedTo = ConvertNrToChar(xPositionAfter + 1).ToString();
         var letterOfSquareBeforeMove = ConvertNrToChar(xPositionBefore + 1);
         var overlap = LegalMovesOverlapSameTypePiece(piece);
@@ -321,21 +326,18 @@ public class Game : MonoBehaviour
             {
                 piece2 = matchedPiece2;
             }
-            Debug.Log("somethign is happening");
 
             if (piece1 != null && piece2 != null)
             {
-                Debug.Log("I am inside if -- I WANT TO BE HERE");
-                var moves1 = piece1.GetMoveSquares();
-                var attacks1 = piece1.GetMoveSquares();
-                var moves2 = piece2.GetMoveSquares();
-                var attacks2 = piece2.GetMoveSquares();
+                (List<Vector2Int> moves1, List<Vector2Int> attacks1)
+                    = piece1.GetPossibleMoves();
+                (List<Vector2Int> moves2, List<Vector2Int> attacks2) 
+                    = piece2.GetPossibleMoves();
 
                 foreach (var move1 in moves1)
                 {
                     foreach (var move2 in moves2)
                     {
-                        Debug.Log("Move1: " + move1 + " move2: " + move2);
                         if (move1 == move2) return true;
                     }
                 }

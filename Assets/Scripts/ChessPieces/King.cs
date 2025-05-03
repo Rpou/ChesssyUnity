@@ -40,6 +40,11 @@ public class King : Piece
         GetComponent<SpriteRenderer>().color = Color.white;
     }
     
+    public override (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetPossibleMoves()
+    {
+        return MovementPatterns.GetKingMoves(this, game);
+    }
+    
     public override List<Vector2Int> GetMoveSquares()
     {
         return _moveSquares;

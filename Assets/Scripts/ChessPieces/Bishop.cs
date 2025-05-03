@@ -23,6 +23,11 @@ public class Bishop : Piece
         return null;
     }
     
+    public override (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetPossibleMoves()
+    {
+        return MovementPatterns.GetBishopMoves(this, game);
+    }
+    
     public override List<Vector2Int> GetMoveSquares()
     {
         return _moveSquares;
