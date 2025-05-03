@@ -46,12 +46,15 @@ public class MovePlate : MonoBehaviour
 
         Piece piece = reference.GetComponent<Piece>();
         if (piece is King movedKing) movedKing.ChangeHasMoved(true); 
+        if (piece is Pawn pawn && Math.Abs(beforeMoveY - matrixY) == 2) game.SetEnPassantTarget(pawn);
         piece.SetXBoard(matrixX);
         piece.SetYBoard(matrixY);
         piece.SetCoords();
 
         game.SetPosition(reference);
         game.CheckIfCreateQueenFromPawn(matrixX, matrixY, reference, game);
+        
+        
         
         // Check if **opponent’s** king is in check before switching turns
         string opponent = game.GetCurrentPlayer() == "white" ? "black" : "white";

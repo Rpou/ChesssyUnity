@@ -20,7 +20,11 @@ public class Pawn : Piece
 
         foreach (var attack in _attackSquares)
         {
-            if(game.GetPosition(attack.x, attack.y).GetComponent<Piece>() is King) return game.GetPosition(attack.x, attack.y).GetComponent<King>();
+            GameObject maybePiece = game.GetPosition(attack.x, attack.y);
+            if (maybePiece == null) 
+                continue;
+
+            if (maybePiece.GetComponent<Piece>() is King king) return king;
         }
         return null;
     }

@@ -16,7 +16,7 @@ public class Game : MonoBehaviour
     private GameObject[,] positions = new GameObject[8, 8];
     public GameObject[] playerBlack = new GameObject[16];
     public GameObject[] playerWhite = new GameObject[16];
-    private Vector2Int? enPassantTarget;
+    private Pawn _enPassantTarget;
 
     private List<string> moves;
     private string currentPlayer = "white";
@@ -399,5 +399,15 @@ public class Game : MonoBehaviour
     public List<string> GetMoves()
     {
         return moves;
+    }
+
+    public void SetEnPassantTarget(Pawn pawn)
+    {
+        _enPassantTarget = pawn;
+    }
+
+    public Pawn GetEnPassentTarget()
+    {
+        return _enPassantTarget;
     }
 }

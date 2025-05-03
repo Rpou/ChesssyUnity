@@ -232,6 +232,7 @@ public static class MovementPatterns
             {
                 moveSquares.Add(new Vector2Int(x, y + (2 * direction)));
             }
+            
         }
 
         // Diagonal attack moves
@@ -248,6 +249,15 @@ public static class MovementPatterns
         {
             attackSquares.Add(new Vector2Int(x - 1, attackY));
         }
+
+        Pawn pawn = game.GetEnPassentTarget();
+        // EnPassant
+        if (piece == pawn || pawn == null || pawn.GetyBoard() != piece.GetyBoard()) return (moveSquares, attackSquares);
+        
+        var pawnX = pawn.GetxBoard();
+        attackSquares.Add(pawnX > piece.GetxBoard()
+            ? new Vector2Int(x + 1, attackY)
+            : new Vector2Int(x - 1, attackY));
 
         return (moveSquares, attackSquares);
     }
