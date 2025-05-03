@@ -31,16 +31,28 @@ public class MovePlate : MonoBehaviour
         Game game = controller.GetComponent<Game>(); 
 
         GameObject cp = game.GetPosition(matrixX, matrixY);
-
-        if (attack)
-        {
-            if (cp.name == "white_king") game.Winner("black");
-            if (cp.name == "black_king") game.Winner("white");
-            Destroy(cp);
-        }
-
         var beforeMoveX = reference.GetComponent<Piece>().GetxBoard();
         var beforeMoveY = reference.GetComponent<Piece>().GetyBoard();
+        
+        if (attack)
+        {
+            int plusMinusOne = reference.GetComponent<Piece>().GetPlayer().Equals("white") ? -1 : 1;
+            try
+            {
+                var possiblePiece = game.GetPosition(matrixX, matrixY + plusMinusOne).GetComponent<Piece>();
+                if (possiblePiece != null && possiblePiece == game.GetEnPassentTarget())
+                    Destroy(game.GetPosition(matrixX, matrixY + plusMinusOne));
+            }
+            catch
+            {
+                if (cp.name == "white_king") game.Winner("black");
+                if (cp.name == "black_king") game.Winner("white");
+                Destroy(cp);
+            }
+            
+        }
+
+        
 
         game.SetPositionEmpty(beforeMoveX, beforeMoveY);
 

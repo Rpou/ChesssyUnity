@@ -266,13 +266,13 @@ public class Game : MonoBehaviour
         if (piece is Rook)
         {
             if (overlap) result = "R" + letterOfSquareBeforeMove + (yPositionBefore+1) + result + letterOfSquareMovedTo + (yPositionAfter+1);
-            result = "R" + result + letterOfSquareMovedTo + (yPositionAfter+1);
+            else result = "R" + result + letterOfSquareMovedTo + (yPositionAfter+1);
         }
 
         if (piece is Queen)
         {
             if (overlap) result = "Q" + letterOfSquareBeforeMove + (yPositionBefore+1) + result + letterOfSquareMovedTo + (yPositionAfter+1);
-            result = "Q" + result + letterOfSquareMovedTo + (yPositionAfter+1);
+            else result = "Q" + result + letterOfSquareMovedTo + (yPositionAfter+1);
         }
 
         if (piece is King)
