@@ -41,16 +41,23 @@ public class MovePlate : MonoBehaviour
         if (attack)
         {
             int plusMinusOne = reference.GetComponent<Piece>().GetPlayer().Equals("white") ? -1 : 1;
-            try
+
+            var targetPosition = game.GetPosition(matrixX, matrixY + plusMinusOne);
+            if (targetPosition != null)
             {
-                var possiblePiece = game.GetPosition(matrixX, matrixY + plusMinusOne).GetComponent<Piece>();
+                var possiblePiece = targetPosition.GetComponent<Piece>();
                 if (possiblePiece != null && possiblePiece == game.GetEnPassentTarget())
                 {
-                    Destroy(game.GetPosition(matrixX, matrixY + plusMinusOne));
+                    Destroy(targetPosition);
+                }
+                else
+                {
+                    Destroy(cp);
                 }
             }
-            catch
+            else
             {
+                Debug.Log("Destroying: " + cp.name);
                 Destroy(cp);
             }
         }

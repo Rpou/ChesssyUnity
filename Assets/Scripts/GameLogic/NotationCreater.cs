@@ -24,8 +24,8 @@ namespace GameLogic
         {
             if (killedPiece) result = letterOfSquareBeforeMove + result + letterOfSquareMovedTo + (yPositionAfter+1);
             else result = letterOfSquareMovedTo + result + (yPositionAfter+1);
-            if ((game.GetCurrentPlayer() == "white" && xPositionAfter == 7) ||
-                (game.GetCurrentPlayer() == "black" && xPositionAfter == 0)) result += "Q";
+            if ((game.GetCurrentPlayer() == "white" && yPositionAfter == 7) ||
+                (game.GetCurrentPlayer() == "black" && yPositionAfter == 0)) result += "Q";
         }
 
         if (piece is Knight)
