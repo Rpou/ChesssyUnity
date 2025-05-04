@@ -62,9 +62,12 @@ public class MovePlate : MonoBehaviour
 
         game.SetPosition(reference);
         game.CheckIfCreateQueenFromPawn(matrixX, matrixY, reference, game);
-        
+
+        var castled = false;
+        if (piece is King kingMoved) kingMoved.ChangeHasMoved(true);
         if (piece is King movedKing && Math.Abs(beforeMoveX - matrixX) == 2)
         {
+            castled = true;
             // if king moved right
             var isRightRook = matrixX > beforeMoveX;
             Rook rook;
@@ -87,7 +90,7 @@ public class MovePlate : MonoBehaviour
         King king = game.CheckIfKingInCheck(opponent); // 48
         var putInCheck = king != null;
         var move = game.CreateNotation(piece, beforeMoveX, beforeMoveY, 
-            matrixX, matrixY, putInCheck, attack); // 202
+            matrixX, matrixY, putInCheck, attack, castled); // 202
         game.AddMove(move);
         GameObject.Find("SidePanelController").GetComponent<GameLogScript>().LogMove(game);
 

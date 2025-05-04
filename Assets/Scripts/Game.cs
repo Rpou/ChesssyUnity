@@ -250,9 +250,8 @@ public class Game : MonoBehaviour
 
     // worst case: (196) + 6(string made) = 202
     public string CreateNotation(Piece piece, int xPositionBefore, int yPositionBefore, int xPositionAfter, 
-        int yPositionAfter, bool putInCheck, bool killedPiece)
+        int yPositionAfter, bool putInCheck, bool killedPiece, bool castled)
     {
-        
         piece.SetXBoard(xPositionBefore);
         piece.SetYBoard(yPositionBefore);
         piece.SetCoords();
@@ -297,7 +296,13 @@ public class Game : MonoBehaviour
 
         if (piece is King)
         {
-            result = "K" + result + letterOfSquareMovedTo + (yPositionAfter+1);
+            var isRightRook = xPositionAfter > xPositionBefore;
+            if (castled)
+            {
+                if (isRightRook) result = "O-O";
+                else result = "O-O-O";
+            }
+            else result = "K" + result + letterOfSquareMovedTo + (yPositionAfter+1);
         }
         
         if (putInCheck) result += "+";

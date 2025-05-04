@@ -392,6 +392,7 @@ public static class MovementPatterns
         // if rook is right of king
         if (rook.GetxBoard() > king.GetxBoard())
         {
+            game.SetPositionEmpty(king.GetxBoard() + 1, king.GetyBoard());
             rook.SetXBoard(king.GetxBoard() - 1);
             rook.SetYBoard(king.GetyBoard());
             rook.SetCoords();
@@ -399,6 +400,7 @@ public static class MovementPatterns
         }
         else
         {
+            game.SetPositionEmpty(king.GetxBoard() - 2, king.GetyBoard());
             rook.SetXBoard(king.GetxBoard() + 1);
             rook.SetYBoard(king.GetyBoard());
             rook.SetCoords();
