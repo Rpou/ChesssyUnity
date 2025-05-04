@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Resources;
+using GameLogic;
 using UnityEngine;
 
 public class MovePlate : MonoBehaviour
@@ -89,8 +90,8 @@ public class MovePlate : MonoBehaviour
         string opponent = game.GetCurrentPlayer() == "white" ? "black" : "white";
         King king = game.CheckIfKingInCheck(opponent); // 48
         var putInCheck = king != null;
-        var move = game.CreateNotation(piece, beforeMoveX, beforeMoveY, 
-            matrixX, matrixY, putInCheck, attack, castled); // 202
+        var move = NotationCreater.CreateNotation(piece, beforeMoveX, beforeMoveY, 
+            matrixX, matrixY, putInCheck, attack, castled, game); // 202
         game.AddMove(move);
         GameObject.Find("SidePanelController").GetComponent<GameLogScript>().LogMove(game);
 
