@@ -293,12 +293,13 @@ public static class MovementPatterns
         Pawn pawn = game.GetEnPassentTarget();
         // EnPassant
         if (piece == pawn || pawn == null || pawn.GetyBoard() != piece.GetyBoard()) return (moveSquares, attackSquares);
-        
-        var pawnX = pawn.GetxBoard();
-        attackSquares.Add(pawnX > piece.GetxBoard()
-            ? new Vector2Int(x + 1, attackY)
-            : new Vector2Int(x - 1, attackY));
-
+        if (pawn.GetxBoard() == piece.GetxBoard() + 1 || pawn.GetxBoard() == piece.GetxBoard() - 1)
+        {
+            var pawnX = pawn.GetxBoard();
+            attackSquares.Add(pawnX > piece.GetxBoard()
+                ? new Vector2Int(x + 1, attackY)
+                : new Vector2Int(x - 1, attackY));
+        }
         return (moveSquares, attackSquares);
     }
 

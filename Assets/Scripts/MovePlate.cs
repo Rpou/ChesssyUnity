@@ -12,6 +12,8 @@ public class MovePlate : MonoBehaviour
 
     GameObject reference = null;
 
+    private int enPassentMove;
+
     //Board Position
     int matrixX;
     int matrixY;
@@ -64,6 +66,8 @@ public class MovePlate : MonoBehaviour
         game.SetPosition(reference);
         game.CheckIfCreateQueenFromPawn(matrixX, matrixY, reference, game);
 
+        // if it has been too long, remove enpassent target.
+        if (enPassentMove + 1 < game.GetMoves().Count) game.SetEnPassantTarget(null);
         var castled = false;
         if (piece is King kingMoved) kingMoved.ChangeHasMoved(true);
         if (piece is King movedKing && Math.Abs(beforeMoveX - matrixX) == 2)
@@ -84,7 +88,11 @@ public class MovePlate : MonoBehaviour
             movedKing.ChangeHasMoved(true);
         }
         if (piece is Rook movedRook) movedRook.SetHasMoved(true);
-        if (piece is Pawn pawn && Math.Abs(beforeMoveY - matrixY) == 2) game.SetEnPassantTarget(pawn);
+        if (piece is Pawn pawn && Math.Abs(beforeMoveY - matrixY) == 2)
+        {
+            enPassentMove = game.GetMoves().Count;
+            game.SetEnPassantTarget(pawn);
+        }
         
         // Check if **opponent’s** king is in check before switching turns
         string opponent = game.GetCurrentPlayer() == "white" ? "black" : "white";
