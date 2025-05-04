@@ -113,6 +113,34 @@ public static class MovementPatterns
             new int[] { 0, 1 }, new int[] { 0, -1 }, new int[] { -1, -1 }, new int[] { -1, 0 },
             new int[] { -1, 1 }, new int[] { 1, -1 }, new int[] { 1, 0 }, new int[] { 1, 1 }
         };
+        
+        if (piece is King king && !king.GetHasMoved())
+        {
+            var player = game.GetCurrentPlayer();
+            GameObject rookLeft;
+            GameObject rookRight;
+            if (player == "White")
+            {
+                rookLeft = game.GetPosition(0, 0);
+                rookRight = game.GetPosition(7, 0);
+            }
+            else
+            {
+                rookLeft = game.GetPosition(0, 7);
+                rookRight = game.GetPosition(7, 7);
+            }
+
+            if (rookRight != null && rookRight.GetComponent<Piece>() is Rook rightRook && 
+                game.GetPosition(x+1, y) == null && game.GetPosition(x+2, y) == null)
+            {
+                moveSquares.Add(CreateCastlingMove(king, rightRook));
+            }
+            if (rookLeft != null && rookLeft.GetComponent<Piece>() is Rook leftRook &&
+                game.GetPosition(x-1, y) == null && game.GetPosition(x-2, y) == null && game.GetPosition(x-3, y) == null)
+            {
+                moveSquares.Add(CreateCastlingMove(king, leftRook));
+            }
+        }
 
         foreach (var dir in directions)
         {
@@ -282,7 +310,6 @@ public static class MovementPatterns
             {
                 game.SpawnMovePlate(move.x, move.y, piece);
             }
-            
         }
 
         foreach (var attack in attackSquares)
@@ -291,7 +318,6 @@ public static class MovementPatterns
             {
                 game.SpawnAttackMovePlate(attack.x,attack.y, piece);
             }
-            
         }
     }
     
@@ -343,6 +369,41 @@ public static class MovementPatterns
         game.SetPosition(piece.gameObject);
 
         return king == null;
+    }
+
+    /// <summary>
+    /// Creates the castling move for the king. It does NOT move the rook.
+    /// That has to be handled somewhere else.
+    /// </summary>
+    /// <param name="king"></param>
+    /// <param name="rook"></param>
+    /// <param name="game"></param>
+    /// <returns></returns>
+    private static Vector2Int CreateCastlingMove(King king, Rook rook)
+    {
+        // if rook is right of king
+        if (rook.GetxBoard() > king.GetxBoard()) return new Vector2Int(king.GetxBoard() + 2, king.GetyBoard());
+        
+        return new Vector2Int(king.GetxBoard() - 2, king.GetyBoard());
+    }
+
+    public static void MoveRookAfterCastlingMove(King king, Rook rook, Game game)
+    {
+        // if rook is right of king
+        if (rook.GetxBoard() > king.GetxBoard())
+        {
+            rook.SetXBoard(king.GetxBoard() - 1);
+            rook.SetYBoard(king.GetyBoard());
+            rook.SetCoords();
+            game.SetPosition(rook.gameObject);
+        }
+        else
+        {
+            rook.SetXBoard(king.GetxBoard() + 1);
+            rook.SetYBoard(king.GetyBoard());
+            rook.SetCoords();
+            game.SetPosition(rook.gameObject);
+        }
     }
     
 }

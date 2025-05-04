@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Resources;
 using UnityEngine;
 
 public class MovePlate : MonoBehaviour
@@ -55,14 +56,31 @@ public class MovePlate : MonoBehaviour
 
         Piece piece = reference.GetComponent<Piece>();
         
-        if (piece is King movedKing) movedKing.ChangeHasMoved(true); 
-        if (piece is Pawn pawn && Math.Abs(beforeMoveY - matrixY) == 2) game.SetEnPassantTarget(pawn);
         piece.SetXBoard(matrixX);
         piece.SetYBoard(matrixY);
         piece.SetCoords();
 
         game.SetPosition(reference);
         game.CheckIfCreateQueenFromPawn(matrixX, matrixY, reference, game);
+        
+        if (piece is King movedKing && Math.Abs(beforeMoveX - matrixX) == 2)
+        {
+            // if king moved right
+            var isRightRook = matrixX > beforeMoveX;
+            Rook rook;
+            if (isRightRook)
+            {
+                rook = (Rook)game.GetPosition(beforeMoveX + 3, beforeMoveY).GetComponent<Piece>();
+            }
+            else
+            {
+                rook = (Rook)game.GetPosition(beforeMoveX - 4, beforeMoveY).GetComponent<Piece>();
+            }
+            MovementPatterns.MoveRookAfterCastlingMove(movedKing, rook, game);
+            movedKing.ChangeHasMoved(true);
+        }
+        if (piece is Rook movedRook) movedRook.SetHasMoved(true);
+        if (piece is Pawn pawn && Math.Abs(beforeMoveY - matrixY) == 2) game.SetEnPassantTarget(pawn);
         
         // Check if **opponent’s** king is in check before switching turns
         string opponent = game.GetCurrentPlayer() == "white" ? "black" : "white";

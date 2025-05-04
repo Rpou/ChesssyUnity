@@ -170,7 +170,6 @@ public class Game : MonoBehaviour
         {
             Piece piece = gameObject.GetComponent<Piece>();
             (List<Vector2Int> pieceMoves, List<Vector2Int> pieceAttacks) = piece.GetAllLegalMoves();
-            Debug.Log("movecout: " + pieceMoves.Count +  " PieceAttack: " + pieceAttacks.Count);
             if (pieceMoves.Count != 0 || pieceAttacks.Count != 0) return false;
         }
 

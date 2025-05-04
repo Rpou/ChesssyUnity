@@ -5,6 +5,7 @@ public class Rook : Piece
 {
     private List<Vector2Int> _moveSquares = new List<Vector2Int>();
     private List<Vector2Int> _attackSquares = new List<Vector2Int>();
+    private bool _hasMoved = false;
     
     public override King CanSeeKing()
     {
@@ -17,7 +18,6 @@ public class Rook : Piece
         return null;
     }
     
-    
     public override List<Vector2Int> GetMoveSquares()
     {
         return _moveSquares;
@@ -25,5 +25,15 @@ public class Rook : Piece
     public override List<Vector2Int> GetAttackSquares()
     {
         return _attackSquares;
+    }
+
+    public void SetHasMoved(bool hasMoved)
+    {
+        _hasMoved = hasMoved;
+    }
+
+    public bool HasMoved()
+    {
+        return _hasMoved;
     }
 }
