@@ -48,10 +48,12 @@ public class MovePlate : MonoBehaviour
                 var possiblePiece = targetPosition.GetComponent<Piece>();
                 if (possiblePiece != null && possiblePiece == game.GetEnPassentTarget())
                 {
+                    Debug.Log("Destroying: " + possiblePiece.name);
                     Destroy(targetPosition);
                 }
                 else
                 {
+                    Debug.Log("Destroying: " + cp.name);
                     Destroy(cp);
                 }
             }
@@ -110,12 +112,12 @@ public class MovePlate : MonoBehaviour
         game.AddMove(move);
         GameObject.Find("SidePanelController").GetComponent<GameLogScript>().LogMove(game);
 
-        if (putInCheck)
+        if (!game.AnyLegalMoves(opponent))
         {
-            Debug.Log("HE IS IN CHECK");
-            var isCheckMate = game.IsCheckMate(opponent);
-            Debug.Log("IS IT CHECKMATE: " + isCheckMate);
-            if (isCheckMate) game.Winner(game.GetCurrentPlayer());
+            Debug.Log("NO LEGAL MOVES");
+            Debug.Log("IS IT CHECKMATE: " + putInCheck);
+            if (putInCheck) game.Winner(game.GetCurrentPlayer());
+            game.Winner(null);
         }
         
         game.NextTurn();

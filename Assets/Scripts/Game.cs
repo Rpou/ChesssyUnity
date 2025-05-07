@@ -159,33 +159,37 @@ public class Game : MonoBehaviour
         return null;
     }
 
-    public bool IsCheckMate(string opponent)
+    public bool AnyLegalMoves(string opponent)
     {
         List<GameObject> allPieces = new List<GameObject>();
 
         allPieces.AddRange(opponent == "black" ? playerBlack : playerWhite);
 
-        // Check if any opponent piece can attack the king
+        // Check if any opponent piece can move
         foreach (var gameObject in allPieces)
         {
+            if(gameObject == null || !gameObject.activeSelf) continue;
             Piece piece = gameObject.GetComponent<Piece>();
             (List<Vector2Int> pieceMoves, List<Vector2Int> pieceAttacks) = piece.GetAllLegalMoves();
-            if (pieceMoves.Count != 0 || pieceAttacks.Count != 0) return false;
+            if (pieceMoves.Count != 0 || pieceAttacks.Count != 0) return true;
         }
 
-        return true;
+        return false;
     }
 
     public void Winner(string playerWinner)
     {
         gameOver = true;
-        if (GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<Text>() == null)
+        if (playerWinner == null)
         {
-            Console.WriteLine("ur dumb lol");
+            GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<TextMeshProUGUI>().enabled = true;
+            GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<TextMeshProUGUI>().text = "it is a draw!";
         }
-        GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<TextMeshProUGUI>().enabled = true;
-        GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<TextMeshProUGUI>().text = playerWinner + " is the winner";
-
+        else
+        {
+            GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<TextMeshProUGUI>().enabled = true;
+            GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<TextMeshProUGUI>().text = playerWinner + " is the winner";
+        }
         GameObject.FindGameObjectWithTag("RestartTag").GetComponent<TextMeshProUGUI>().enabled = true;
     }
 
