@@ -24,9 +24,9 @@ public class ChessAgent : Agent
     public override void OnEpisodeBegin()
     {
         // restart your scene & rebind the controller reference
-        SceneManager.LoadScene("Game");
         gameController = GameObject.FindGameObjectWithTag("GameController")
                                    .GetComponent<Game>();
+        gameController.ResetGame();
         isWhite = true; // reset to whichever side starts
     }
 
@@ -58,7 +58,7 @@ public class ChessAgent : Agent
         sensor.AddObservation(isWhite ? 1f : 0f);
     }
 
-    // mask out any of the 4 544 moves that aren’t legal right now
+    // remove any of the 4544 moves that aren’t legal right now
     public override void WriteDiscreteActionMask(IDiscreteActionMask mask)
     {
         string me = isWhite ? "white" : "black";
@@ -81,18 +81,13 @@ public class ChessAgent : Agent
             if (!ok) mask.SetActionEnabled(0, i, false);
         }
     }
-
     public override void OnActionReceived(ActionBuffers actions)
     {
         int idx = actions.DiscreteActions[0];
         var m = allPossibleMoves[idx];
 
         // apply the move by hand‐coding what your MovePlate.OnMouseUp does
-        // (capture, en passant, castling, promotion, updating `positions[,]`,
-        // adding to `moves`, toggling currentPlayer, etc.)
-        // …
-        // for brevity, assume you’ve exposed a helper in Game:
-        gameController.ExecuteMove(m); // you’ll need to write this!
+        gameController.ExecuteMove(m); 
 
         // terminal reward on game end
         if (gameController.IsGameOver())

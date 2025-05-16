@@ -36,31 +36,7 @@ public class Game : MonoBehaviour
             Debug.LogError("SpriteManager not found! Make sure it's inside the 'Resources' folder.");
         }
 
-        // Initialize white pieces
-        playerWhite = new GameObject[]
-        {
-            CreatePiece<Rook>("white_rook", 0, 0), CreatePiece<Knight>("white_knight", 1, 0),
-            CreatePiece<Bishop>("white_bishop", 2, 0), CreatePiece<Queen>("white_queen", 3, 0),
-            CreatePiece<King>("white_king", 4, 0), CreatePiece<Bishop>("white_bishop", 5, 0),
-            CreatePiece<Knight>("white_knight", 6, 0), CreatePiece<Rook>("white_rook", 7, 0),
-            CreatePiece<Pawn>("white_pawn", 0, 1), CreatePiece<Pawn>("white_pawn", 1, 1),
-            CreatePiece<Pawn>("white_pawn", 2, 1), CreatePiece<Pawn>("white_pawn", 3, 1),
-            CreatePiece<Pawn>("white_pawn", 4, 1), CreatePiece<Pawn>("white_pawn", 5, 1),
-            CreatePiece<Pawn>("white_pawn", 6, 1), CreatePiece<Pawn>("white_pawn", 7, 1)
-        };
-
-        // Initialize black pieces
-        playerBlack = new GameObject[]
-        {
-            CreatePiece<Rook>("black_rook", 0, 7), CreatePiece<Knight>("black_knight", 1, 7),
-            CreatePiece<Bishop>("black_bishop", 2, 7), CreatePiece<Queen>("black_queen", 3, 7),
-            CreatePiece<King>("black_king", 4, 7), CreatePiece<Bishop>("black_bishop", 5, 7),
-            CreatePiece<Knight>("black_knight", 6, 7), CreatePiece<Rook>("black_rook", 7, 7),
-            CreatePiece<Pawn>("black_pawn", 0, 6), CreatePiece<Pawn>("black_pawn", 1, 6),
-            CreatePiece<Pawn>("black_pawn", 2, 6), CreatePiece<Pawn>("black_pawn", 3, 6),
-            CreatePiece<Pawn>("black_pawn", 4, 6), CreatePiece<Pawn>("black_pawn", 5, 6),
-            CreatePiece<Pawn>("black_pawn", 6, 6), CreatePiece<Pawn>("black_pawn", 7, 6)
-        };
+        InitializePieces();
     }
 
     void Update()
@@ -71,6 +47,30 @@ public class Game : MonoBehaviour
             SceneManager.LoadScene("Game");
         }
     }
+    
+    public void ResetGame()
+    {
+        // 1) Destroy all current pieces
+        for (int x = 0; x < 8; x++)
+        for (int y = 0; y < 8; y++)
+            if (positions[x,y] != null) Destroy(positions[x,y]);
+
+        // 2) Destroy any move-plates
+        DestroyMovePlates();
+    
+        // 3) Reset state vars
+        moves.Clear();
+        currentPlayer = "white";
+        gameOver = false;
+        result = 0;
+        _enPassantTarget = null;
+    
+        // 4) Re-spawn everything exactly like Start() does:
+        InitializePieces();  
+    
+        // 5) Hide any UI “winner” text, clear move log panel...
+    }
+
 
     public void NextTurn()
     {
@@ -335,6 +335,35 @@ public class Game : MonoBehaviour
         // 8) Next turn & cleanup
         NextTurn();
         DestroyMovePlates();
+    }
+
+    private void InitializePieces()
+    {
+        // Initialize white pieces
+        playerWhite = new GameObject[]
+        {
+            CreatePiece<Rook>("white_rook", 0, 0), CreatePiece<Knight>("white_knight", 1, 0),
+            CreatePiece<Bishop>("white_bishop", 2, 0), CreatePiece<Queen>("white_queen", 3, 0),
+            CreatePiece<King>("white_king", 4, 0), CreatePiece<Bishop>("white_bishop", 5, 0),
+            CreatePiece<Knight>("white_knight", 6, 0), CreatePiece<Rook>("white_rook", 7, 0),
+            CreatePiece<Pawn>("white_pawn", 0, 1), CreatePiece<Pawn>("white_pawn", 1, 1),
+            CreatePiece<Pawn>("white_pawn", 2, 1), CreatePiece<Pawn>("white_pawn", 3, 1),
+            CreatePiece<Pawn>("white_pawn", 4, 1), CreatePiece<Pawn>("white_pawn", 5, 1),
+            CreatePiece<Pawn>("white_pawn", 6, 1), CreatePiece<Pawn>("white_pawn", 7, 1)
+        };
+
+        // Initialize black pieces
+        playerBlack = new GameObject[]
+        {
+            CreatePiece<Rook>("black_rook", 0, 7), CreatePiece<Knight>("black_knight", 1, 7),
+            CreatePiece<Bishop>("black_bishop", 2, 7), CreatePiece<Queen>("black_queen", 3, 7),
+            CreatePiece<King>("black_king", 4, 7), CreatePiece<Bishop>("black_bishop", 5, 7),
+            CreatePiece<Knight>("black_knight", 6, 7), CreatePiece<Rook>("black_rook", 7, 7),
+            CreatePiece<Pawn>("black_pawn", 0, 6), CreatePiece<Pawn>("black_pawn", 1, 6),
+            CreatePiece<Pawn>("black_pawn", 2, 6), CreatePiece<Pawn>("black_pawn", 3, 6),
+            CreatePiece<Pawn>("black_pawn", 4, 6), CreatePiece<Pawn>("black_pawn", 5, 6),
+            CreatePiece<Pawn>("black_pawn", 6, 6), CreatePiece<Pawn>("black_pawn", 7, 6)
+        };
     }
 
     public int GetResult()

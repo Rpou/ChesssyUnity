@@ -1,0 +1,26 @@
+﻿behaviors:
+  ChessAgent:               # ← must match your Behavior Name
+    trainer_type: ppo
+    max_steps: 5e6          # adjust as needed; chess is hard
+    time_horizon: 64        # episode length in steps
+    summary_freq: 10000
+
+    network_settings:
+      normalize: true
+      hidden_units: 256
+      num_layers: 4
+
+    reward_signals:
+      extrinsic:
+        gamma: 0.99
+        strength: 1.0
+
+    hyperparameters:
+      batch_size: 1024
+      buffer_size: 10240
+      learning_rate: 3e-4
+      beta: 5e-3
+      epsilon: 0.2
+
+    self_play:
+      team_change: 50000    # swap which agent plays white/black periodically
