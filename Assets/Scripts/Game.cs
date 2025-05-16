@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using GameLogic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -21,6 +22,7 @@ public class Game : MonoBehaviour
     private List<string> moves;
     private string currentPlayer = "white";
     private bool gameOver = false;
+    private int result;
 
     void Start()
     {
@@ -92,20 +94,24 @@ public class Game : MonoBehaviour
         return obj;
     }
 
-    public void CheckIfCreateQueenFromPawn(int matrixX, int matrixY, GameObject cp, Game game)
+    public bool CheckIfCreateQueenFromPawn(int matrixX, int matrixY, GameObject cp, Game game)
     {
         var piece = cp.GetComponent<Piece>();
         if (matrixY == 0 && piece.name == "black_pawn")
         {
             Destroy(cp);
             CreatePiece<Queen>("black_queen", matrixX, matrixY);
+            return true;
         }
 
         if (matrixY == 7 && piece.name == "white_pawn")
         {
             Destroy(cp);
             CreatePiece<Queen>("white_queen", matrixX, matrixY);
+            return true;
         }
+
+        return false;
     }
 
     // worst case: 16 + 16 + 16 = 48
@@ -178,6 +184,9 @@ public class Game : MonoBehaviour
 
     public void Winner(string playerWinner)
     {
+
+        if (playerWinner == "white") result = 1;
+        else if (playerWinner == "black") result = -1;
         gameOver = true;
         if (GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<Text>() == null)
         {
@@ -232,7 +241,7 @@ public class Game : MonoBehaviour
         mpScript.SetReference(piece.gameObject);
         mpScript.SetCoords(matrixX, matrixY);
     }
-
+    
     public bool PositionOnBoard(int x, int y)
     {
         return x >= 0 && y >= 0 && x < positions.GetLength(0) && y < positions.GetLength(1);
@@ -246,6 +255,91 @@ public class Game : MonoBehaviour
         {
             Destroy(movePlates[i]);
         }
+    }
+    
+    public void ExecuteMove(Move m)
+    {
+        int fromX = m.FromFile, fromY = m.FromRank;
+        int toX   = m.ToFile,   toY   = m.ToRank;
+        GameObject movingObj = GetPosition(fromX, fromY);
+        var piece = movingObj.GetComponent<Piece>();
+
+        // 1) Capture / en-passant
+        bool killed = false;
+        // standard capture
+        if (GetPosition(toX, toY) != null)
+        {
+            Destroy(GetPosition(toX, toY));
+            killed = true;
+        }
+        // en-passant capture
+        else if (piece is Pawn && fromX != toX && GetPosition(toX, toY) == null)
+        {
+            var ep = _enPassantTarget;
+            Destroy(ep.gameObject);
+            SetPositionEmpty(ep.GetxBoard(), ep.GetyBoard());
+            killed = true;
+        }
+
+        // 2) Move piece in positions[,] array
+        SetPositionEmpty(fromX, fromY);
+        piece.SetXBoard(toX);
+        piece.SetYBoard(toY);
+        piece.SetCoords();
+        SetPosition(movingObj);
+
+        // 3) Promotion
+        CheckIfCreateQueenFromPawn(toX, toY, movingObj, this);
+
+        // 4) En-passant target tracking
+        if (piece is Pawn && Mathf.Abs(toY - fromY) == 2)
+            _enPassantTarget = piece as Pawn;
+        else
+            _enPassantTarget = null;
+
+        // 5) Castling
+        bool castled = false;
+        if (piece is King king)
+        {
+            king.ChangeHasMoved(true);
+            if (Mathf.Abs(toX - fromX) == 2)
+            {
+                castled = true;
+                // find the rook and slide it
+                var rookX = (toX > fromX) ? fromX + 3 : fromX - 4;
+                var rookObj = GetPosition(rookX, fromY)
+                              .GetComponent<Rook>();
+                MovementPatterns.MoveRookAfterCastlingMove(king, rookObj, this);
+            }
+        }
+        else if (piece is Rook rook)
+        {
+            rook.SetHasMoved(true);
+        }
+
+        // 6) Notation & logging
+        string opponent = currentPlayer == "white" ? "black" : "white";
+        bool inCheck = CheckIfKingInCheck(opponent) != null;
+        string moveSan = NotationCreater.CreateNotation(
+            piece, fromX, fromY, toX, toY,
+            inCheck, killed, castled, this);
+        AddMove(moveSan);
+        GameObject.Find("SidePanelController")
+                  .GetComponent<GameLogScript>()
+                  .LogMove(this);
+
+        // 7) Checkmate?
+        if (inCheck && IsCheckMate(opponent))
+            Winner(currentPlayer);
+
+        // 8) Next turn & cleanup
+        NextTurn();
+        DestroyMovePlates();
+    }
+
+    public int GetResult()
+    {
+        return result;
     }
     
     public void SetPosition(GameObject obj)

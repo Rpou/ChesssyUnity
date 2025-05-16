@@ -71,7 +71,7 @@ public class MovePlate : MonoBehaviour
         piece.SetCoords();
 
         game.SetPosition(reference);
-        game.CheckIfCreateQueenFromPawn(matrixX, matrixY, reference, game);
+        var promotion = game.CheckIfCreateQueenFromPawn(matrixX, matrixY, reference, game);
 
         // if it has been too long, remove enpassent target.
         if (enPassentMove + 1 < game.GetMoves().Count) game.SetEnPassantTarget(null);
@@ -117,6 +117,20 @@ public class MovePlate : MonoBehaviour
             Debug.Log("IS IT CHECKMATE: " + isCheckMate);
             if (isCheckMate) game.Winner(game.GetCurrentPlayer());
         }
+
+        if (promotion)
+        {
+            GameObject.FindGameObjectWithTag("GameController")
+                .GetComponent<Game>()
+                .ExecuteMove(new Move(beforeMoveX, beforeMoveY, matrixX, matrixY,"Q"));
+        }
+        else
+        {
+            GameObject.FindGameObjectWithTag("GameController")
+                .GetComponent<Game>()
+                .ExecuteMove(new Move(beforeMoveX, beforeMoveY, matrixX, matrixY,""));
+        }
+        
         
         game.NextTurn();
         game.DestroyMovePlates(); // 16
