@@ -114,10 +114,8 @@ public class MovePlate : MonoBehaviour
 
         if (!game.AnyLegalMoves(opponent))
         {
-            Debug.Log("NO LEGAL MOVES");
-            Debug.Log("IS IT CHECKMATE: " + putInCheck);
             if (putInCheck) game.Winner(game.GetCurrentPlayer());
-            game.Winner(null);
+            else game.Winner(null);
         }
         
         game.NextTurn();
