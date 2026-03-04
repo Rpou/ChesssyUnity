@@ -97,14 +97,26 @@ public class Game : MonoBehaviour
         var piece = cp.GetComponent<Piece>();
         if (matrixY == 0 && piece.name == "black_pawn")
         {
+            var promotedQueen = CreatePiece<Queen>("black_queen", matrixX, matrixY);
+            ReplacePieceInPlayerArray(playerBlack, cp, promotedQueen);
             Destroy(cp);
-            CreatePiece<Queen>("black_queen", matrixX, matrixY);
         }
 
         if (matrixY == 7 && piece.name == "white_pawn")
         {
+            var promotedQueen = CreatePiece<Queen>("white_queen", matrixX, matrixY);
+            ReplacePieceInPlayerArray(playerWhite, cp, promotedQueen);
             Destroy(cp);
-            CreatePiece<Queen>("white_queen", matrixX, matrixY);
+        }
+    }
+
+    private static void ReplacePieceInPlayerArray(GameObject[] pieces, GameObject oldPiece, GameObject newPiece)
+    {
+        for (var i = 0; i < pieces.Length; i++)
+        {
+            if (pieces[i] != oldPiece) continue;
+            pieces[i] = newPiece;
+            return;
         }
     }
 
@@ -132,28 +144,16 @@ public class Game : MonoBehaviour
             return kingInCheck;
         }
 
-        if (opponent == "black")
+        if (isSimulation) return null;
+
+        var playerPieces = opponent == "black" ? playerBlack : playerWhite;
+        foreach (var gameObject in playerPieces)
         {
-            foreach (var gameObject in playerWhite)
+            if (gameObject == null || !gameObject.activeSelf) continue; // Skip if the piece is destroyed
+            Piece piece = gameObject.GetComponent<Piece>();
+            if (piece is King king)
             {
-                if (gameObject == null || !gameObject.activeSelf) continue; // Skip if the piece is destroyed
-                Piece piece = gameObject.GetComponent<Piece>();
-                if (piece is King king)
-                {
-                    king.SetInCheck(false);
-                }
-            }
-        }
-        else
-        {
-            foreach (var gameObject in playerBlack)
-            {
-                if (gameObject == null || !gameObject.activeSelf) continue; // Skip if the piece is destroyed
-                Piece piece = gameObject.GetComponent<Piece>();
-                if (piece is King king)
-                {
-                    king.SetInCheck(false);
-                }
+                king.SetInCheck(false);
             }
         }
         return null;

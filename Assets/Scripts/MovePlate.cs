@@ -12,8 +12,6 @@ public class MovePlate : MonoBehaviour
 
     GameObject reference = null;
 
-    private int enPassentMove;
-
     //Board Position
     int matrixX;
     int matrixY;
@@ -35,29 +33,33 @@ public class MovePlate : MonoBehaviour
         Game game = controller.GetComponent<Game>(); 
 
         GameObject cp = game.GetPosition(matrixX, matrixY);
+        Piece piece = reference.GetComponent<Piece>();
         var beforeMoveX = reference.GetComponent<Piece>().GetxBoard();
         var beforeMoveY = reference.GetComponent<Piece>().GetyBoard();
         
         if (attack)
         {
-            int plusMinusOne = reference.GetComponent<Piece>().GetPlayer().Equals("white") ? -1 : 1;
-
-            var targetPosition = game.GetPosition(matrixX, matrixY + plusMinusOne);
-            if (targetPosition != null)
+            var isEnPassantCapture = false;
+            if (piece is Pawn)
             {
-                var possiblePiece = targetPosition.GetComponent<Piece>();
-                if (possiblePiece != null && possiblePiece == game.GetEnPassentTarget())
+                int plusMinusOne = piece.GetPlayer().Equals("white") ? -1 : 1;
+                int enPassantY = matrixY + plusMinusOne;
+
+                if (game.PositionOnBoard(matrixX, enPassantY))
                 {
-                    Debug.Log("Destroying: " + possiblePiece.name);
-                    Destroy(targetPosition);
-                }
-                else
-                {
-                    Debug.Log("Destroying: " + cp.name);
-                    Destroy(cp);
+                    var targetPosition = game.GetPosition(matrixX, enPassantY);
+                    var possiblePiece = targetPosition != null ? targetPosition.GetComponent<Piece>() : null;
+                    if (possiblePiece != null && possiblePiece == game.GetEnPassentTarget())
+                    {
+                        isEnPassantCapture = true;
+                        game.SetPositionEmpty(matrixX, enPassantY);
+                        Debug.Log("Destroying: " + possiblePiece.name);
+                        Destroy(targetPosition);
+                    }
                 }
             }
-            else
+
+            if (!isEnPassantCapture && cp != null)
             {
                 Debug.Log("Destroying: " + cp.name);
                 Destroy(cp);
@@ -65,8 +67,6 @@ public class MovePlate : MonoBehaviour
         }
 
         game.SetPositionEmpty(beforeMoveX, beforeMoveY);
-
-        Piece piece = reference.GetComponent<Piece>();
         
         piece.SetXBoard(matrixX);
         piece.SetYBoard(matrixY);
@@ -75,8 +75,6 @@ public class MovePlate : MonoBehaviour
         game.SetPosition(reference);
         game.CheckIfCreateQueenFromPawn(matrixX, matrixY, reference, game);
 
-        // if it has been too long, remove enpassent target.
-        if (enPassentMove + 1 < game.GetMoves().Count) game.SetEnPassantTarget(null);
         var castled = false;
         if (piece is King kingMoved) kingMoved.ChangeHasMoved(true);
         if (piece is King movedKing && Math.Abs(beforeMoveX - matrixX) == 2)
@@ -99,8 +97,11 @@ public class MovePlate : MonoBehaviour
         if (piece is Rook movedRook) movedRook.SetHasMoved(true);
         if (piece is Pawn pawn && Math.Abs(beforeMoveY - matrixY) == 2)
         {
-            enPassentMove = game.GetMoves().Count;
             game.SetEnPassantTarget(pawn);
+        }
+        else
+        {
+            game.SetEnPassantTarget(null);
         }
         
         // Check if **opponent’s** king is in check before switching turns

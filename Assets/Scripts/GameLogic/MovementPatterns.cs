@@ -116,10 +116,10 @@ public static class MovementPatterns
         
         if (piece is King king && !king.GetHasMoved())
         {
-            var player = game.GetCurrentPlayer();
+            var player = piece.GetPlayer();
             GameObject rookLeft;
             GameObject rookRight;
-            if (player == "White")
+            if (player == "white")
             {
                 rookLeft = game.GetPosition(0, 0);
                 rookRight = game.GetPosition(7, 0);
@@ -130,13 +130,21 @@ public static class MovementPatterns
                 rookRight = game.GetPosition(7, 7);
             }
 
+            var kingStartsInCheck = game.CheckIfKingInCheck(player, true) != null;
+
             if (rookRight != null && rookRight.GetComponent<Piece>() is Rook rightRook && 
-                game.GetPosition(x+1, y) == null && game.GetPosition(x+2, y) == null)
+                game.GetPosition(x + 1, y) == null && game.GetPosition(x + 2, y) == null && !rightRook.HasMoved() &&
+                !kingStartsInCheck &&
+                IsMoveSafe(x + 1, y, king, game) &&
+                IsMoveSafe(x + 2, y, king, game))
             {
                 moveSquares.Add(CreateCastlingMove(king, rightRook));
             }
             if (rookLeft != null && rookLeft.GetComponent<Piece>() is Rook leftRook &&
-                game.GetPosition(x-1, y) == null && game.GetPosition(x-2, y) == null && game.GetPosition(x-3, y) == null)
+                game.GetPosition(x - 1, y) == null && game.GetPosition(x - 2, y) == null && game.GetPosition(x - 3, y) == null && !leftRook.HasMoved() &&
+                !kingStartsInCheck &&
+                IsMoveSafe(x - 1, y, king, game) &&
+                IsMoveSafe(x - 2, y, king, game))
             {
                 moveSquares.Add(CreateCastlingMove(king, leftRook));
             }
@@ -292,13 +300,17 @@ public static class MovementPatterns
 
         Pawn pawn = game.GetEnPassentTarget();
         // EnPassant
-        if (piece == pawn || pawn == null || pawn.GetyBoard() != piece.GetyBoard()) return (moveSquares, attackSquares);
+        if (piece == pawn || pawn == null || pawn.GetPlayer() == piece.GetPlayer() || pawn.GetyBoard() != piece.GetyBoard())
+            return (moveSquares, attackSquares);
         if (pawn.GetxBoard() == piece.GetxBoard() + 1 || pawn.GetxBoard() == piece.GetxBoard() - 1)
         {
-            var pawnX = pawn.GetxBoard();
-            attackSquares.Add(pawnX > piece.GetxBoard()
+            var enPassantAttackSquare = pawn.GetxBoard() > piece.GetxBoard()
                 ? new Vector2Int(x + 1, attackY)
-                : new Vector2Int(x - 1, attackY));
+                : new Vector2Int(x - 1, attackY);
+            if (game.PositionOnBoard(enPassantAttackSquare.x, enPassantAttackSquare.y))
+            {
+                attackSquares.Add(enPassantAttackSquare);
+            }
         }
         return (moveSquares, attackSquares);
     }
@@ -325,19 +337,40 @@ public static class MovementPatterns
     public static bool IsMoveSafe(int x, int y, Piece piece, Game game)
     {
         // Save the current board state
-        GameObject pieceOnAttackSquare = game.GetPosition(x, y);
+        GameObject capturedPiece = game.GetPosition(x, y);
         GameObject pieceImGonnaMove = piece.gameObject;
         int correctX = piece.GetxBoard();
         int correctY = piece.GetyBoard();
+        int capturedX = x;
+        int capturedY = y;
+
+        // Handle en passant simulation where the captured pawn is not on the destination square.
+        if (capturedPiece == null && piece is Pawn pawn)
+        {
+            int direction = pawn.GetPlayer().Equals("white") ? 1 : -1;
+            int enPassantPawnY = y - direction;
+            if (x != correctX && y - correctY == direction && game.PositionOnBoard(x, enPassantPawnY))
+            {
+                GameObject enPassantPiece = game.GetPosition(x, enPassantPawnY);
+                Pawn enPassantTarget = game.GetEnPassentTarget();
+                if (enPassantPiece != null && enPassantPiece == enPassantTarget &&
+                    enPassantPiece.GetComponent<Piece>().GetPlayer() != piece.GetPlayer())
+                {
+                    capturedPiece = enPassantPiece;
+                    capturedX = x;
+                    capturedY = enPassantPawnY;
+                }
+            }
+        }
 
         // Simulate the move
         game.SetPositionEmpty(correctX, correctY);
 
         // If capturing a piece, temporarily remove it
-        if (pieceOnAttackSquare != null)
+        if (capturedPiece != null)
         {
-            game.SetPositionEmpty(x, y); // Remove the opponent's piece for simulation
-            pieceOnAttackSquare.SetActive(false);
+            game.SetPositionEmpty(capturedX, capturedY); // Remove the opponent's piece for simulation
+            capturedPiece.SetActive(false);
         }
         
         piece.SetXBoard(x);
@@ -352,14 +385,14 @@ public static class MovementPatterns
         game.SetPositionEmpty(x, y); // Remove our piece from the new location
 
         // Restore the captured piece (if there was one)
-        if (pieceOnAttackSquare != null)
+        if (capturedPiece != null)
         {
-            Piece pieceOnAttackSquarepiece = pieceOnAttackSquare.GetComponent<Piece>();
-            pieceOnAttackSquarepiece.SetXBoard(x);
-            pieceOnAttackSquarepiece.SetYBoard(y);
-            pieceOnAttackSquarepiece.SetCoords();
-            pieceOnAttackSquare.SetActive(true);
-            game.SetPosition(pieceOnAttackSquare); // Restore enemy piece
+            Piece restoredPiece = capturedPiece.GetComponent<Piece>();
+            restoredPiece.SetXBoard(capturedX);
+            restoredPiece.SetYBoard(capturedY);
+            restoredPiece.SetCoords();
+            capturedPiece.SetActive(true);
+            game.SetPosition(capturedPiece); // Restore enemy piece
         }
 
         // Restore our piece back to the original spot
