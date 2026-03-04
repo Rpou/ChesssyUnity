@@ -13,20 +13,44 @@ public abstract class Piece : MonoBehaviour
 
     private List<Vector2Int> _moveSquares;
     private List<Vector2Int> _attackSquares;
-    
-    private void Start()
-    {
-        game = GameObject.FindGameObjectWithTag("GameController").GetComponent<Game>();
-        spriteManager = Resources.Load<SpriteManager>("SpriteManager");
 
-        // Set the piece sprite based on name
-        GetComponent<SpriteRenderer>().sprite = spriteManager.GetSprite(name);
+    private void InitializeInternal(Game gameInstance, SpriteManager loadedSpriteManager)
+    {
+        game = gameInstance;
+        spriteManager = loadedSpriteManager;
+        if (spriteManager == null)
+        {
+            spriteManager = Resources.Load<SpriteManager>("SpriteManager");
+        }
+
+        if (spriteManager != null)
+        {
+            // Set the piece sprite based on name
+            GetComponent<SpriteRenderer>().sprite = spriteManager.GetSprite(name);
+        }
 
         // Determine player color based on name
         _player = name.StartsWith("black") ? "black" : "white";
 
         // Set position on board
         SetCoords();
+    }
+
+    public void Initialize(Game gameInstance, SpriteManager loadedSpriteManager)
+    {
+        InitializeInternal(gameInstance, loadedSpriteManager);
+    }
+
+    private void Start()
+    {
+        if (game != null && spriteManager != null && !string.IsNullOrEmpty(_player))
+        {
+            return;
+        }
+
+        var gameController = GameObject.FindGameObjectWithTag("GameController");
+        var gameFromScene = gameController != null ? gameController.GetComponent<Game>() : null;
+        InitializeInternal(gameFromScene, null);
     }
     
     private void OnMouseUp()

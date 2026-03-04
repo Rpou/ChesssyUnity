@@ -9,14 +9,8 @@ namespace GameLogic
     public static string CreateNotation(Piece piece, int xPositionBefore, int yPositionBefore, int xPositionAfter, 
         int yPositionAfter, bool putInCheck, bool killedPiece, bool castled, Game game)
     {
-        piece.SetXBoard(xPositionBefore);
-        piece.SetYBoard(yPositionBefore);
-        piece.SetCoords();
-        game.SetPosition(piece.gameObject);
-        
         var letterOfSquareMovedTo = ConvertNrToChar(xPositionAfter + 1).ToString();
         var letterOfSquareBeforeMove = ConvertNrToChar(xPositionBefore + 1);
-        var overlap = LegalMovesOverlapSameTypePiece(piece, game);
         
         var result = "";
         if (killedPiece) result += "x";
@@ -26,7 +20,16 @@ namespace GameLogic
             else result = letterOfSquareMovedTo + result + (yPositionAfter+1);
             if ((game.GetCurrentPlayer() == "white" && yPositionAfter == 7) ||
                 (game.GetCurrentPlayer() == "black" && yPositionAfter == 0)) result += "Q";
+            if (putInCheck) result += "+";
+            return result;
         }
+
+        piece.SetXBoard(xPositionBefore);
+        piece.SetYBoard(yPositionBefore);
+        piece.SetCoords();
+        game.SetPosition(piece.gameObject);
+        
+        var overlap = LegalMovesOverlapSameTypePiece(piece, game);
 
         if (piece is Knight)
         {

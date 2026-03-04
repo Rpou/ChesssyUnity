@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
+using GameLogic;
 
 
 public class Game : MonoBehaviour
@@ -85,6 +86,7 @@ public class Game : MonoBehaviour
         piece.SetXBoard(x);
         piece.SetYBoard(y);
         piece.name = name;
+        piece.Initialize(this, spriteManager);
 
         // Set position in the board
         SetPosition(obj);
@@ -92,22 +94,26 @@ public class Game : MonoBehaviour
         return obj;
     }
 
-    public void CheckIfCreateQueenFromPawn(int matrixX, int matrixY, GameObject cp, Game game)
+    public GameObject CheckIfCreateQueenFromPawn(int matrixX, int matrixY, GameObject cp)
     {
         var piece = cp.GetComponent<Piece>();
         if (matrixY == 0 && piece.name == "black_pawn")
         {
             var promotedQueen = CreatePiece<Queen>("black_queen", matrixX, matrixY);
             ReplacePieceInPlayerArray(playerBlack, cp, promotedQueen);
-            Destroy(cp);
+            cp.SetActive(false);
+            return promotedQueen;
         }
 
         if (matrixY == 7 && piece.name == "white_pawn")
         {
             var promotedQueen = CreatePiece<Queen>("white_queen", matrixX, matrixY);
             ReplacePieceInPlayerArray(playerWhite, cp, promotedQueen);
-            Destroy(cp);
+            cp.SetActive(false);
+            return promotedQueen;
         }
+
+        return cp;
     }
 
     private static void ReplacePieceInPlayerArray(GameObject[] pieces, GameObject oldPiece, GameObject newPiece)
@@ -235,6 +241,108 @@ public class Game : MonoBehaviour
         mpScript.attack = true;
         mpScript.SetReference(piece.gameObject);
         mpScript.SetCoords(matrixX, matrixY);
+    }
+
+    public void MakeNextMove(GameObject reference, int matrixX, int matrixY, bool attack)
+    {
+        GameObject cp = GetPosition(matrixX, matrixY);
+        Piece piece = reference.GetComponent<Piece>();
+        var beforeMoveX = reference.GetComponent<Piece>().GetxBoard();
+        var beforeMoveY = reference.GetComponent<Piece>().GetyBoard();
+        
+        if (attack)
+        {
+            var isEnPassantCapture = false;
+            if (piece is Pawn)
+            {
+                int plusMinusOne = piece.GetPlayer().Equals("white") ? -1 : 1;
+                int enPassantY = matrixY + plusMinusOne;
+
+                if (PositionOnBoard(matrixX, enPassantY))
+                {
+                    var targetPosition = GetPosition(matrixX, enPassantY);
+                    var possiblePiece = targetPosition != null ? targetPosition.GetComponent<Piece>() : null;
+                    if (possiblePiece != null && possiblePiece == GetEnPassentTarget())
+                    {
+                        isEnPassantCapture = true;
+                        SetPositionEmpty(matrixX, enPassantY);
+                        targetPosition.SetActive(false);
+                        Debug.Log("Destroying: " + possiblePiece.name);
+                        Destroy(targetPosition);
+                    }
+                }
+            }
+
+            if (!isEnPassantCapture && cp != null)
+            {
+                cp.SetActive(false);
+                Debug.Log("Destroying: " + cp.name);
+                Destroy(cp);
+            }
+        }
+
+        SetPositionEmpty(beforeMoveX, beforeMoveY);
+        
+        piece.SetXBoard(matrixX);
+        piece.SetYBoard(matrixY);
+        piece.SetCoords();
+
+        SetPosition(reference);
+        GameObject promotedPiece = CheckIfCreateQueenFromPawn(matrixX, matrixY, reference);
+        var wasPromoted = promotedPiece != reference;
+
+        var castled = false;
+        if (piece is King kingMoved) kingMoved.ChangeHasMoved(true);
+        if (piece is King movedKing && Math.Abs(beforeMoveX - matrixX) == 2)
+        {
+            castled = true;
+            // if king moved right
+            var isRightRook = matrixX > beforeMoveX;
+            Rook rook;
+            if (isRightRook)
+            {
+                rook = (Rook)GetPosition(beforeMoveX + 3, beforeMoveY).GetComponent<Piece>();
+            }
+            else
+            {
+                rook = (Rook)GetPosition(beforeMoveX - 4, beforeMoveY).GetComponent<Piece>();
+            }
+            MovementPatterns.MoveRookAfterCastlingMove(movedKing, rook, this);
+            movedKing.ChangeHasMoved(true);
+        }
+        if (piece is Rook movedRook) movedRook.SetHasMoved(true);
+        if (piece is Pawn pawn && Math.Abs(beforeMoveY - matrixY) == 2)
+        {
+            SetEnPassantTarget(pawn);
+        }
+        else
+        {
+            SetEnPassantTarget(null);
+        }
+        CheckIfKingInCheck(GetCurrentPlayer());
+        
+        // Check if **opponent’s** king is in check before switching turns
+        string opponent = GetCurrentPlayer() == "white" ? "black" : "white";
+        King king = CheckIfKingInCheck(opponent); // 48
+        var putInCheck = king != null;
+        var move = NotationCreater.CreateNotation(piece, beforeMoveX, beforeMoveY, 
+            matrixX, matrixY, putInCheck, attack, castled, this); // 202
+        AddMove(move);
+        GameObject.Find("SidePanelController").GetComponent<GameLogScript>().LogMove(this);
+
+        if (!AnyLegalMoves(opponent))
+        {
+            if (putInCheck) Winner(GetCurrentPlayer());
+            else Winner(null);
+        }
+
+        if (wasPromoted)
+        {
+            Destroy(reference);
+        }
+        
+        NextTurn();
+        DestroyMovePlates(); // 16
     }
 
     public bool PositionOnBoard(int x, int y)
