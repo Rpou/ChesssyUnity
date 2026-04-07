@@ -6,6 +6,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
 using GameLogic;
+using System.Linq;
 
 
 public class Game : MonoBehaviour
@@ -165,11 +166,11 @@ public class Game : MonoBehaviour
         return null;
     }
 
-    public bool AnyLegalMoves(string opponent)
+    public bool AnyLegalMoves(string player)
     {
         List<GameObject> allPieces = new List<GameObject>();
 
-        allPieces.AddRange(opponent == "black" ? playerBlack : playerWhite);
+        allPieces.AddRange(player == "black" ? playerBlack : playerWhite);
 
         // Check if any opponent piece can move
         foreach (var gameObject in allPieces)
@@ -245,40 +246,13 @@ public class Game : MonoBehaviour
 
     public void MakeNextMove(GameObject reference, int matrixX, int matrixY, bool attack)
     {
-        GameObject cp = GetPosition(matrixX, matrixY);
         Piece piece = reference.GetComponent<Piece>();
         var beforeMoveX = reference.GetComponent<Piece>().GetxBoard();
         var beforeMoveY = reference.GetComponent<Piece>().GetyBoard();
         
         if (attack)
         {
-            var isEnPassantCapture = false;
-            if (piece is Pawn)
-            {
-                int plusMinusOne = piece.GetPlayer().Equals("white") ? -1 : 1;
-                int enPassantY = matrixY + plusMinusOne;
-
-                if (PositionOnBoard(matrixX, enPassantY))
-                {
-                    var targetPosition = GetPosition(matrixX, enPassantY);
-                    var possiblePiece = targetPosition != null ? targetPosition.GetComponent<Piece>() : null;
-                    if (possiblePiece != null && possiblePiece == GetEnPassentTarget())
-                    {
-                        isEnPassantCapture = true;
-                        SetPositionEmpty(matrixX, enPassantY);
-                        targetPosition.SetActive(false);
-                        Debug.Log("Destroying: " + possiblePiece.name);
-                        Destroy(targetPosition);
-                    }
-                }
-            }
-
-            if (!isEnPassantCapture && cp != null)
-            {
-                cp.SetActive(false);
-                Debug.Log("Destroying: " + cp.name);
-                Destroy(cp);
-            }
+            HandleAttack(piece, matrixX, matrixY);
         }
 
         SetPositionEmpty(beforeMoveX, beforeMoveY);
@@ -343,6 +317,73 @@ public class Game : MonoBehaviour
         
         NextTurn();
         DestroyMovePlates(); // 16
+    }
+
+    /// <summary>
+    /// Handles taking an opponent piece.
+    /// </summary>
+    /// <param name="piece"></param>
+    /// <param name="matrixX"></param>
+    /// <param name="matrixY"></param>
+    private void HandleAttack(Piece piece, int matrixX, int matrixY)
+    {
+        GameObject cp = GetPosition(matrixX, matrixY);
+        var isEnPassantCapture = false;
+        if (piece is Pawn)
+        {
+            int plusMinusOne = piece.GetPlayer().Equals("white") ? -1 : 1;
+            int enPassantY = matrixY + plusMinusOne;
+
+            if (PositionOnBoard(matrixX, enPassantY))
+            {
+                var targetPosition = GetPosition(matrixX, enPassantY);
+                var possiblePiece = targetPosition != null ? targetPosition.GetComponent<Piece>() : null;
+                if (possiblePiece != null && possiblePiece == GetEnPassentTarget())
+                {
+                    isEnPassantCapture = true;
+                    SetPositionEmpty(matrixX, enPassantY);
+                    targetPosition.SetActive(false);
+                    Debug.Log("Destroying: " + possiblePiece.name);
+                    Destroy(targetPosition);
+                }
+            }
+        }
+
+        if (!isEnPassantCapture && cp != null)
+        {
+            cp.SetActive(false);
+            Debug.Log("Destroying: " + cp.name);
+            Destroy(cp);
+        }
+        
+    }
+
+    private List<Move> PossibleMoves(string currentPlayer)
+    {
+        List<GameObject> allPieces = new List<GameObject>();
+        List<Move> possibleMoves = new List<Move>();
+
+        allPieces.AddRange(currentPlayer == "black" ? playerBlack : playerWhite);
+
+        // Check if any opponent piece can move
+        foreach (var gameObject in allPieces)
+        {
+            if(gameObject == null || !gameObject.activeSelf) continue;
+            Piece piece = gameObject.GetComponent<Piece>();
+            (List<Vector2Int> pieceMoves, List<Vector2Int> pieceAttacks) = piece.GetAllLegalMoves();
+            
+            foreach (var move in pieceMoves)
+            {
+                possibleMoves.Add(new Move(piece, move));
+            }
+
+            foreach (var move in pieceAttacks)
+            {
+                possibleMoves.Add(new Move(piece, move));
+            }
+        }
+
+        return possibleMoves;
     }
 
     public bool PositionOnBoard(int x, int y)
