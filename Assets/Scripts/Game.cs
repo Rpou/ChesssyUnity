@@ -24,6 +24,13 @@ public class Game : MonoBehaviour
     private string currentPlayer = "white";
     private bool gameOver = false;
 
+    public bool whiteIsAI = false;
+    public bool blackIsAI = true;
+
+    public AI blackAI;
+    public AI whiteAI;
+    private bool aiIsMakingMove = false;
+
     void Start()
     {
         moves = new List<string>();
@@ -61,6 +68,7 @@ public class Game : MonoBehaviour
             CreatePiece<Pawn>("black_pawn", 4, 6), CreatePiece<Pawn>("black_pawn", 5, 6),
             CreatePiece<Pawn>("black_pawn", 6, 6), CreatePiece<Pawn>("black_pawn", 7, 6)
         };
+        TryMakeAIMove();
     }
 
     void Update()
@@ -75,6 +83,7 @@ public class Game : MonoBehaviour
     public void NextTurn()
     {
         currentPlayer = (currentPlayer == "white") ? "black" : "white";
+        TryMakeAIMove();
     }
 
     // Generic method to create a chess piece of a specific type
@@ -125,6 +134,30 @@ public class Game : MonoBehaviour
             pieces[i] = newPiece;
             return;
         }
+    }
+
+    private void TryMakeAIMove()
+    {
+        if (!gameOver && IsCurrentPlayerAI() && !aiIsMakingMove)
+        {
+            StartCoroutine(MakeAIMoveCoroutine());
+        }
+    }
+
+    private IEnumerator MakeAIMoveCoroutine()
+    {
+        aiIsMakingMove = true;
+
+        // Small delay so the move feels visible
+        yield return new WaitForSeconds(0.3f);
+
+        if (!gameOver && IsCurrentPlayerAI())
+        {
+            if (currentPlayer == "black") blackAI.MakeMove(this);
+            else whiteAI.MakeMove(this);
+        }
+
+        aiIsMakingMove = false;
     }
 
     // worst case: 16 + 16 + 16 = 48
@@ -182,6 +215,16 @@ public class Game : MonoBehaviour
         }
 
         return false;
+    }
+
+    public GameState GetGameState()
+    {
+        return new GameState(this);
+    }
+
+    public GameState CreateNextState(Move move)
+    {
+        return GetGameState().ApplyMove(move, IsAttackMove(move));
     }
 
     public void Winner(string playerWinner)
@@ -358,7 +401,7 @@ public class Game : MonoBehaviour
         
     }
 
-    private List<Move> PossibleMoves(string currentPlayer)
+    public List<Move> GetPossibleMoves(string currentPlayer)
     {
         List<GameObject> allPieces = new List<GameObject>();
         List<Move> possibleMoves = new List<Move>();
@@ -379,11 +422,46 @@ public class Game : MonoBehaviour
 
             foreach (var move in pieceAttacks)
             {
-                possibleMoves.Add(new Move(piece, move));
+                possibleMoves.Add(new Move(piece, move, true));
             }
         }
 
         return possibleMoves;
+    }
+
+    public List<Move> GetPossibleMoves()
+    {
+        return GetPossibleMoves(currentPlayer);
+    }
+
+    public bool IsAttackMove(Move move)
+    {
+        if (GetPosition(move.GetMatrixX(), move.GetMatrixY()) != null)
+        {
+            return true;
+        }
+
+        Piece piece = move.GetPiece();
+        if (piece == null)
+        {
+            var gameObject = GetPosition(move.GetFromMatrixX(), move.GetFromMatrixY());
+            piece = gameObject != null ? gameObject.GetComponent<Piece>() : null;
+        }
+
+        if (piece is not Pawn pawn)
+        {
+            return false;
+        }
+
+        if (move.GetMatrixX() == move.GetFromMatrixX())
+        {
+            return false;
+        }
+
+        var enPassantTarget = GetEnPassentTarget();
+        return enPassantTarget != null &&
+               enPassantTarget.GetxBoard() == move.GetMatrixX() &&
+               enPassantTarget.GetyBoard() == pawn.GetyBoard();
     }
 
     public bool PositionOnBoard(int x, int y)
@@ -447,5 +525,11 @@ public class Game : MonoBehaviour
     public Pawn GetEnPassentTarget()
     {
         return _enPassantTarget;
+    }
+
+    public bool IsCurrentPlayerAI()
+    {
+        return (currentPlayer == "white" && whiteIsAI) ||
+           (currentPlayer == "black" && blackIsAI);
     }
 }
