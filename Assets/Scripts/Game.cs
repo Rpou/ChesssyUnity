@@ -24,7 +24,7 @@ public class Game : MonoBehaviour
     private string currentPlayer = "white";
     private bool gameOver = false;
 
-    public bool whiteIsAI = false;
+    public bool whiteIsAI = true;
     public bool blackIsAI = true;
 
     public AI blackAI;
@@ -149,7 +149,7 @@ public class Game : MonoBehaviour
         aiIsMakingMove = true;
 
         // Small delay so the move feels visible
-        yield return new WaitForSeconds(0.3f);
+        yield return new WaitForSeconds(0.0f);
 
         if (!gameOver && IsCurrentPlayerAI())
         {
@@ -158,6 +158,7 @@ public class Game : MonoBehaviour
         }
 
         aiIsMakingMove = false;
+        TryMakeAIMove();
     }
 
     // worst case: 16 + 16 + 16 = 48

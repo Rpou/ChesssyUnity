@@ -5,6 +5,8 @@ public class Knight : Piece
 {
     private List<Vector2Int> _moveSquares = new List<Vector2Int>();
     private List<Vector2Int> _attackSquares = new List<Vector2Int>();
+
+    private int worth = 3;
     
     public override King CanSeeKing()
     {
@@ -24,5 +26,10 @@ public class Knight : Piece
     public override List<Vector2Int> GetAttackSquares()
     {
         return _attackSquares;
+    }
+
+    public override int GetWorth()
+    {
+        return worth;
     }
 }

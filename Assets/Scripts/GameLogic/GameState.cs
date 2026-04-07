@@ -94,6 +94,114 @@ public class GameState
     }
 
     /// <summary>
+    /// Gets all possible moves for one player in this state.
+    /// This matches the naming in Game.cs and returns legal moves.
+    /// </summary>
+    /// <param name="player">The player color.</param>
+    /// <returns>All legal moves for that player.</returns>
+    public List<Move> GetPossibleMoves(string player)
+    {
+        return GetMoves(player, true);
+    }
+
+    /// <summary>
+    /// Gets all possible moves for the current player in this state.
+    /// </summary>
+    /// <returns>All legal moves for the current player.</returns>
+    public List<Move> GetPossibleMoves()
+    {
+        return GetPossibleMoves(CurrentPlayer);
+    }
+
+    /// <summary>
+    /// Gets all raw moves for one player before king-safety filtering.
+    /// </summary>
+    /// <param name="player">The player color.</param>
+    /// <returns>All non-filtered moves for that player.</returns>
+    public List<Move> GetAllPossibleMoves(string player)
+    {
+        return GetMoves(player, false);
+    }
+
+    /// <summary>
+    /// Gets all raw moves for the current player before king-safety filtering.
+    /// </summary>
+    /// <returns>All non-filtered moves for the current player.</returns>
+    public List<Move> GetAllPossibleMoves()
+    {
+        return GetAllPossibleMoves(CurrentPlayer);
+    }
+
+    /// <summary>
+    /// Gets all raw moves for one piece in this state.
+    /// </summary>
+    /// <param name="piece">The piece to inspect.</param>
+    /// <returns>The move squares and attack squares for that piece.</returns>
+    public (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetPieceMoves(PieceState piece)
+    {
+        if (piece == null || !piece.IsActive)
+        {
+            return (new List<Vector2Int>(), new List<Vector2Int>());
+        }
+
+        if (piece.IsPawn) return GetPawnMoves(piece);
+        if (piece.IsKnight) return GetKnightMoves(piece);
+        if (piece.IsBishop) return GetBishopMoves(piece);
+        if (piece.IsRook) return GetRookMoves(piece);
+        if (piece.IsQueen) return GetQueenMoves(piece);
+        return GetKingMoves(piece);
+    }
+
+    /// <summary>
+    /// Gets the legal moves for one piece after king-safety filtering.
+    /// </summary>
+    /// <param name="piece">The piece to inspect.</param>
+    /// <returns>The legal move squares and legal attack squares for that piece.</returns>
+    public (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetAllLegalMoves(PieceState piece)
+    {
+        var (moveSquares, attackSquares) = GetPieceMoves(piece);
+        var legalMoveSquares = new List<Vector2Int>();
+        var legalAttackSquares = new List<Vector2Int>();
+
+        foreach (var move in moveSquares)
+        {
+            if (IsMoveSafe(piece, move.x, move.y))
+            {
+                legalMoveSquares.Add(move);
+            }
+        }
+
+        foreach (var attack in attackSquares)
+        {
+            if (IsMoveSafe(piece, attack.x, attack.y))
+            {
+                legalAttackSquares.Add(attack);
+            }
+        }
+
+        return (legalMoveSquares, legalAttackSquares);
+    }
+
+    /// <summary>
+    /// Checks if a player has at least one legal move in this state.
+    /// </summary>
+    /// <param name="player">The player color.</param>
+    /// <returns>True if that player has a legal move.</returns>
+    public bool AnyLegalMoves(string player)
+    {
+        foreach (var piece in GetActivePieces(player))
+        {
+            var (moveSquares, attackSquares) = GetAllLegalMoves(piece);
+            if (moveSquares.Count != 0 || attackSquares.Count != 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Creates a new copied state with the move applied.
     /// </summary>
     /// <param name="move">The move to simulate.</param>
@@ -139,6 +247,49 @@ public class GameState
         return EnPassantTargetSquare.HasValue &&
                EnPassantTargetSquare.Value.x == move.GetMatrixX() &&
                EnPassantTargetSquare.Value.y == movingPiece.MatrixY;
+    }
+
+    /// <summary>
+    /// Checks if the player's king is in check in this state.
+    /// </summary>
+    /// <param name="player">The player color.</param>
+    /// <returns>True if the king is in check.</returns>
+    public bool IsKingInCheck(string player)
+    {
+        PieceState king = null;
+        foreach (var piece in GetActivePieces(player))
+        {
+            if (piece.IsKing)
+            {
+                king = piece;
+                break;
+            }
+        }
+
+        if (king == null)
+        {
+            return false;
+        }
+
+        var opponent = player == "white" ? "black" : "white";
+        foreach (var piece in GetActivePieces(opponent))
+        {
+            if (piece.IsKing)
+            {
+                continue;
+            }
+
+            var (_, attackSquares) = GetPieceMoves(piece);
+            foreach (var attack in attackSquares)
+            {
+                if (attack.x == king.MatrixX && attack.y == king.MatrixY)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -361,6 +512,307 @@ public class GameState
 
         return new Vector2Int(enPassantTarget.GetxBoard(), enPassantTarget.GetyBoard());
     }
+
+    private List<Move> GetMoves(string player, bool legalOnly)
+    {
+        var possibleMoves = new List<Move>();
+
+        foreach (var piece in GetActivePieces(player))
+        {
+            (List<Vector2Int> pieceMoves, List<Vector2Int> pieceAttacks) = legalOnly
+                ? GetAllLegalMoves(piece)
+                : GetPieceMoves(piece);
+
+            foreach (var move in pieceMoves)
+            {
+                possibleMoves.Add(new Move(piece.MatrixX, piece.MatrixY, move.x, move.y));
+            }
+
+            foreach (var move in pieceAttacks)
+            {
+                possibleMoves.Add(new Move(piece.MatrixX, piece.MatrixY, move.x, move.y, true));
+            }
+        }
+
+        return possibleMoves;
+    }
+
+    private bool IsMoveSafe(PieceState piece, int x, int y)
+    {
+        var move = new Move(piece.MatrixX, piece.MatrixY, x, y, IsAttackMove(piece, x, y));
+        var nextState = ApplyMove(move, move.GetIsAttack());
+        return !nextState.IsKingInCheck(piece.Player);
+    }
+
+    private bool IsAttackMove(PieceState piece, int x, int y)
+    {
+        if (GetPosition(x, y) != null)
+        {
+            return true;
+        }
+
+        if (!piece.IsPawn || x == piece.MatrixX)
+        {
+            return false;
+        }
+
+        return EnPassantTargetSquare.HasValue &&
+               EnPassantTargetSquare.Value.x == x &&
+               EnPassantTargetSquare.Value.y == piece.MatrixY;
+    }
+
+    private (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) CanSeeInLine(int xIncrement,
+        int yIncrement, PieceState piece)
+    {
+        var movableSquares = new List<Vector2Int>();
+        var attackableSquares = new List<Vector2Int>();
+
+        int x = piece.MatrixX + xIncrement;
+        int y = piece.MatrixY + yIncrement;
+
+        while (PositionOnBoard(x, y) && GetPosition(x, y) == null)
+        {
+            movableSquares.Add(new Vector2Int(x, y));
+            x += xIncrement;
+            y += yIncrement;
+        }
+
+        if (PositionOnBoard(x, y))
+        {
+            var pieceOnSquare = GetPosition(x, y);
+            if (pieceOnSquare != null && pieceOnSquare.Player != piece.Player)
+            {
+                attackableSquares.Add(new Vector2Int(x, y));
+            }
+        }
+
+        return (movableSquares, attackableSquares);
+    }
+
+    private (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) CanSeePoint(int x, int y,
+        PieceState piece)
+    {
+        var movableSquares = new List<Vector2Int>();
+        var attackableSquares = new List<Vector2Int>();
+
+        if (!PositionOnBoard(x, y))
+        {
+            return (movableSquares, attackableSquares);
+        }
+
+        var pieceOnSquare = GetPosition(x, y);
+        if (pieceOnSquare == null)
+        {
+            movableSquares.Add(new Vector2Int(x, y));
+        }
+        else if (pieceOnSquare.Player != piece.Player)
+        {
+            attackableSquares.Add(new Vector2Int(x, y));
+        }
+
+        return (movableSquares, attackableSquares);
+    }
+
+    private (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetKingMoves(PieceState piece)
+    {
+        var moveSquares = new List<Vector2Int>();
+        var attackSquares = new List<Vector2Int>();
+        int x = piece.MatrixX;
+        int y = piece.MatrixY;
+
+        int[][] directions =
+        {
+            new[] { 0, 1 }, new[] { 0, -1 }, new[] { -1, -1 }, new[] { -1, 0 },
+            new[] { -1, 1 }, new[] { 1, -1 }, new[] { 1, 0 }, new[] { 1, 1 }
+        };
+
+        if (!piece.HasMoved)
+        {
+            PieceState rookLeft;
+            PieceState rookRight;
+            if (piece.Player == "white")
+            {
+                rookLeft = GetPosition(0, 0);
+                rookRight = GetPosition(7, 0);
+            }
+            else
+            {
+                rookLeft = GetPosition(0, 7);
+                rookRight = GetPosition(7, 7);
+            }
+
+            var kingStartsInCheck = IsKingInCheck(piece.Player);
+
+            if (rookRight != null && rookRight.IsRook && !rookRight.HasMoved &&
+                GetPosition(x + 1, y) == null && GetPosition(x + 2, y) == null &&
+                !kingStartsInCheck &&
+                IsMoveSafe(piece, x + 1, y) &&
+                IsMoveSafe(piece, x + 2, y))
+            {
+                moveSquares.Add(new Vector2Int(x + 2, y));
+            }
+
+            if (rookLeft != null && rookLeft.IsRook && !rookLeft.HasMoved &&
+                GetPosition(x - 1, y) == null && GetPosition(x - 2, y) == null && GetPosition(x - 3, y) == null &&
+                !kingStartsInCheck &&
+                IsMoveSafe(piece, x - 1, y) &&
+                IsMoveSafe(piece, x - 2, y))
+            {
+                moveSquares.Add(new Vector2Int(x - 2, y));
+            }
+        }
+
+        foreach (var dir in directions)
+        {
+            var (moves, attacks) = CanSeePoint(x + dir[0], y + dir[1], piece);
+            moveSquares.AddRange(moves);
+            attackSquares.AddRange(attacks);
+        }
+
+        return (moveSquares, attackSquares);
+    }
+
+    private (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetQueenMoves(PieceState piece)
+    {
+        var moveSquares = new List<Vector2Int>();
+        var attackSquares = new List<Vector2Int>();
+
+        int[][] directions =
+        {
+            new[] { 1, 0 }, new[] { 0, 1 }, new[] { 1, 1 }, new[] { -1, 0 },
+            new[] { 0, -1 }, new[] { -1, -1 }, new[] { -1, 1 }, new[] { 1, -1 }
+        };
+
+        foreach (var dir in directions)
+        {
+            var (moves, attacks) = CanSeeInLine(dir[0], dir[1], piece);
+            moveSquares.AddRange(moves);
+            attackSquares.AddRange(attacks);
+        }
+
+        return (moveSquares, attackSquares);
+    }
+
+    private (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetRookMoves(PieceState piece)
+    {
+        var moveSquares = new List<Vector2Int>();
+        var attackSquares = new List<Vector2Int>();
+
+        int[][] directions =
+        {
+            new[] { 1, 0 }, new[] { -1, 0 }, new[] { 0, 1 }, new[] { 0, -1 }
+        };
+
+        foreach (var dir in directions)
+        {
+            var (moves, attacks) = CanSeeInLine(dir[0], dir[1], piece);
+            moveSquares.AddRange(moves);
+            attackSquares.AddRange(attacks);
+        }
+
+        return (moveSquares, attackSquares);
+    }
+
+    private (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetBishopMoves(PieceState piece)
+    {
+        var moveSquares = new List<Vector2Int>();
+        var attackSquares = new List<Vector2Int>();
+
+        int[][] directions =
+        {
+            new[] { 1, 1 }, new[] { -1, 1 }, new[] { 1, -1 }, new[] { -1, -1 }
+        };
+
+        foreach (var dir in directions)
+        {
+            var (moves, attacks) = CanSeeInLine(dir[0], dir[1], piece);
+            moveSquares.AddRange(moves);
+            attackSquares.AddRange(attacks);
+        }
+
+        return (moveSquares, attackSquares);
+    }
+
+    private (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetKnightMoves(PieceState piece)
+    {
+        var moveSquares = new List<Vector2Int>();
+        var attackSquares = new List<Vector2Int>();
+
+        int[][] directions =
+        {
+            new[] { 1, 2 }, new[] { -1, 2 }, new[] { 1, -2 }, new[] { -1, -2 },
+            new[] { 2, 1 }, new[] { -2, 1 }, new[] { 2, -1 }, new[] { -2, -1 }
+        };
+
+        foreach (var dir in directions)
+        {
+            var (moves, attacks) = CanSeePoint(piece.MatrixX + dir[0], piece.MatrixY + dir[1], piece);
+            moveSquares.AddRange(moves);
+            attackSquares.AddRange(attacks);
+        }
+
+        return (moveSquares, attackSquares);
+    }
+
+    private (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetPawnMoves(PieceState piece)
+    {
+        var moveSquares = new List<Vector2Int>();
+        var attackSquares = new List<Vector2Int>();
+
+        int x = piece.MatrixX;
+        int y = piece.MatrixY;
+        int direction = piece.Player == "white" ? 1 : -1;
+        int startRow = piece.Player == "white" ? 1 : 6;
+
+        if (PositionOnBoard(x, y + direction) && GetPosition(x, y + direction) == null)
+        {
+            moveSquares.Add(new Vector2Int(x, y + direction));
+
+            if (y == startRow && GetPosition(x, y + (2 * direction)) == null)
+            {
+                moveSquares.Add(new Vector2Int(x, y + (2 * direction)));
+            }
+        }
+
+        int attackY = y + direction;
+
+        if (PositionOnBoard(x + 1, attackY) && GetPosition(x + 1, attackY) != null &&
+            GetPosition(x + 1, attackY).Player != piece.Player)
+        {
+            attackSquares.Add(new Vector2Int(x + 1, attackY));
+        }
+
+        if (PositionOnBoard(x - 1, attackY) && GetPosition(x - 1, attackY) != null &&
+            GetPosition(x - 1, attackY).Player != piece.Player)
+        {
+            attackSquares.Add(new Vector2Int(x - 1, attackY));
+        }
+
+        if (!EnPassantTargetSquare.HasValue || EnPassantTargetSquare.Value.y != y)
+        {
+            return (moveSquares, attackSquares);
+        }
+
+        var enPassantTarget = GetPosition(EnPassantTargetSquare.Value.x, EnPassantTargetSquare.Value.y);
+        if (enPassantTarget == null || !enPassantTarget.IsPawn || enPassantTarget.Player == piece.Player)
+        {
+            return (moveSquares, attackSquares);
+        }
+
+        if (enPassantTarget.MatrixX == x + 1 || enPassantTarget.MatrixX == x - 1)
+        {
+            var enPassantAttackSquare = enPassantTarget.MatrixX > x
+                ? new Vector2Int(x + 1, attackY)
+                : new Vector2Int(x - 1, attackY);
+
+            if (PositionOnBoard(enPassantAttackSquare.x, enPassantAttackSquare.y))
+            {
+                attackSquares.Add(enPassantAttackSquare);
+            }
+        }
+
+        return (moveSquares, attackSquares);
+    }
 }
 
 public class PieceState
@@ -374,7 +826,10 @@ public class PieceState
     public bool IsInCheck { get; set; }
 
     public bool IsPawn => Name.EndsWith("pawn");
+    public bool IsKnight => Name.EndsWith("knight");
+    public bool IsBishop => Name.EndsWith("bishop");
     public bool IsRook => Name.EndsWith("rook");
+    public bool IsQueen => Name.EndsWith("queen");
     public bool IsKing => Name.EndsWith("king");
 
     private PieceState(string name, string player, int matrixX, int matrixY, bool isActive, bool hasMoved,
@@ -398,6 +853,17 @@ public class PieceState
     public PieceState Clone()
     {
         return new PieceState(Name, Player, MatrixX, MatrixY, IsActive, HasMoved, IsInCheck);
+    }
+
+    public int GetWorth()
+    {
+        if (IsPawn) return 1;
+        if (IsKnight) return 3;
+        if (IsBishop) return 3;
+        if (IsRook) return 5;
+        if (IsQueen) return 9;
+        if (IsKing) return 100;
+        return 0;
     }
 
     public void PromoteToQueen()

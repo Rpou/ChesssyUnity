@@ -125,4 +125,5 @@ public abstract class Piece : MonoBehaviour
     
     public void SetXBoard(int x) { _xBoard = x; }
     public void SetYBoard(int y) { _yBoard = y; }
+    public abstract int GetWorth();
 }

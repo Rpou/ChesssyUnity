@@ -8,7 +8,7 @@ public class King : Piece
     private bool _hasMoved;
     private List<Vector2Int> _moveSquares = new List<Vector2Int>();
     private List<Vector2Int> _attackSquares = new List<Vector2Int>();
-    
+    private int worth = 100;
     public override King CanSeeKing()
     {
         return null;
@@ -51,5 +51,9 @@ public class King : Piece
     public bool GetHasMoved()
     {
         return _hasMoved;
+    }
+    public override int GetWorth()
+    {
+        return worth;
     }
 }
