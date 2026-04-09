@@ -161,7 +161,7 @@ public class Game : MonoBehaviour
         TryMakeAIMove();
     }
 
-    // worst case: 16 + 16 + 16 = 48
+    // worst case: 16 + 16*27(432) + 16 = 464
     public King CheckIfKingInCheck(string opponent, bool isSimulation = false)
     {
         List<GameObject> allPieces = new List<GameObject>();
@@ -288,6 +288,7 @@ public class Game : MonoBehaviour
         mpScript.SetCoords(matrixX, matrixY);
     }
 
+    // see king: 646*2(checkKingCheck) +202 + 432(anylegalmoves) + 16. Total: 1942
     public void MakeNextMove(GameObject reference, int matrixX, int matrixY, bool attack)
     {
         Piece piece = reference.GetComponent<Piece>();
@@ -341,7 +342,7 @@ public class Game : MonoBehaviour
         
         // Check if **opponent’s** king is in check before switching turns
         string opponent = GetCurrentPlayer() == "white" ? "black" : "white";
-        King king = CheckIfKingInCheck(opponent); // 48
+        King king = CheckIfKingInCheck(opponent); // 464
         var putInCheck = king != null;
         var move = NotationCreater.CreateNotation(piece, beforeMoveX, beforeMoveY, 
             matrixX, matrixY, putInCheck, attack, castled, this); // 202

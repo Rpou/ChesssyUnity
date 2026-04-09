@@ -8,6 +8,27 @@ using UnityEngine;
 public class GameState
 {
     private readonly PieceState[,] _positions = new PieceState[8, 8];
+    private PieceState _whiteKing;
+    private PieceState _blackKing;
+
+    private sealed class MoveUndoState
+    {
+        public PieceState MovingPiece { get; set; }
+        public int MovingFromX { get; set; }
+        public int MovingFromY { get; set; }
+        public bool MovingHadMoved { get; set; }
+        public string MovingOriginalName { get; set; }
+        public PieceState CapturedPiece { get; set; }
+        public int CapturedX { get; set; }
+        public int CapturedY { get; set; }
+        public bool CapturedWasActive { get; set; }
+        public PieceState CastlingRook { get; set; }
+        public int CastlingRookFromX { get; set; }
+        public int CastlingRookFromY { get; set; }
+        public bool CastlingRookHadMoved { get; set; }
+        public Vector2Int? PreviousEnPassantTargetSquare { get; set; }
+        public string PreviousCurrentPlayer { get; set; }
+    }
 
     public List<PieceState> PlayerWhite { get; }
     public List<PieceState> PlayerBlack { get; }
@@ -19,11 +40,26 @@ public class GameState
     /// Creates a new game state from the current live game.
     /// </summary>
     /// <param name="game">The live game to copy.</param>
+    /// <remarks>
+    /// Runtime: O(p), where p is the number of stored pieces. In a normal chess game this copies up to 32 live pieces
+    /// and then places up to 32 piece states back onto the board array.
+    /// </remarks>
     public GameState(Game game) : this(CreatePieceStates(game.playerWhite), CreatePieceStates(game.playerBlack), game.GetCurrentPlayer(),
             game.IsGameOver(), GetEnPassantTargetSquare(game))
     {
     }
 
+    /// <summary>
+    /// Creates a new game state from already copied piece lists.
+    /// </summary>
+    /// <param name="playerWhite">The stored white pieces.</param>
+    /// <param name="playerBlack">The stored black pieces.</param>
+    /// <param name="currentPlayer">The player whose turn it is.</param>
+    /// <param name="gameOver">Whether the game is over.</param>
+    /// <param name="enPassantTargetSquare">The current en passant target, if any.</param>
+    /// <remarks>
+    /// Runtime: O(p), where p is the number of stored pieces. RebuildPositions visits at most 32 piece states.
+    /// </remarks>
     private GameState(List<PieceState> playerWhite, List<PieceState> playerBlack, string currentPlayer,
         bool gameOver, Vector2Int? enPassantTargetSquare)
     {
@@ -37,10 +73,33 @@ public class GameState
     }
 
     /// <summary>
+    /// Creates a copied game state from an existing state.
+    /// </summary>
+    /// <param name="other">The state to copy.</param>
+    /// <remarks>
+    /// Runtime: O(p), where p is the number of stored pieces. This clones each stored piece once and fills the board array in
+    /// the same pass, so it avoids the extra rebuild pass used by the other constructor.
+    /// </remarks>
+    private GameState(GameState other)
+    {
+        PlayerWhite = new List<PieceState>(other.PlayerWhite.Count);
+        PlayerBlack = new List<PieceState>(other.PlayerBlack.Count);
+        CurrentPlayer = other.CurrentPlayer;
+        GameOver = other.GameOver;
+        EnPassantTargetSquare = other.EnPassantTargetSquare;
+
+        ClonePiecesIntoState(other.PlayerWhite, PlayerWhite);
+        ClonePiecesIntoState(other.PlayerBlack, PlayerBlack);
+    }
+
+    /// <summary>
     /// Gets all stored pieces for one player, including inactive captured pieces.
     /// </summary>
     /// <param name="player">The player color.</param>
     /// <returns>The list of piece states for that player.</returns>
+    /// <remarks>
+    /// Runtime: O(1). This only returns one of the two stored lists.
+    /// </remarks>
     public List<PieceState> GetPieces(string player)
     {
         return player == "black" ? PlayerBlack : PlayerWhite;
@@ -51,6 +110,9 @@ public class GameState
     /// </summary>
     /// <param name="player">The player color.</param>
     /// <returns>The active pieces for that player.</returns>
+    /// <remarks>
+    /// Runtime: O(p), where p is the number of pieces for that player. In chess this loops through at most 16 pieces.
+    /// </remarks>
     public List<PieceState> GetActivePieces(string player)
     {
         var activePieces = new List<PieceState>();
@@ -72,6 +134,9 @@ public class GameState
     /// <param name="x">The x coordinate.</param>
     /// <param name="y">The y coordinate.</param>
     /// <returns>The piece on that square, or null.</returns>
+    /// <remarks>
+    /// Runtime: O(1). This does one bounds check and at most one array lookup.
+    /// </remarks>
     public PieceState GetPosition(int x, int y)
     {
         if (!PositionOnBoard(x, y))
@@ -88,6 +153,9 @@ public class GameState
     /// <param name="x">The x coordinate.</param>
     /// <param name="y">The y coordinate.</param>
     /// <returns>True if the square is on the board.</returns>
+    /// <remarks>
+    /// Runtime: O(1). This is just a few integer comparisons.
+    /// </remarks>
     public bool PositionOnBoard(int x, int y)
     {
         return x >= 0 && y >= 0 && x < _positions.GetLength(0) && y < _positions.GetLength(1);
@@ -99,6 +167,11 @@ public class GameState
     /// </summary>
     /// <param name="player">The player color.</param>
     /// <returns>All legal moves for that player.</returns>
+    /// <remarks>
+    /// Runtime: O(p * c * safetyCheck) in the current implementation because each candidate move is simulated before it is
+    /// returned as legal. In practice this loops through at most 16 active pieces, and each piece can test up to about 27
+    /// candidate targets before filtering.
+    /// </remarks>
     public List<Move> GetPossibleMoves(string player)
     {
         return GetMoves(player, true);
@@ -108,6 +181,9 @@ public class GameState
     /// Gets all possible moves for the current player in this state.
     /// </summary>
     /// <returns>All legal moves for the current player.</returns>
+    /// <remarks>
+    /// Runtime: Same as GetPossibleMoves(string). It still loops through at most 16 active pieces for the current player.
+    /// </remarks>
     public List<Move> GetPossibleMoves()
     {
         return GetPossibleMoves(CurrentPlayer);
@@ -118,6 +194,10 @@ public class GameState
     /// </summary>
     /// <param name="player">The player color.</param>
     /// <returns>All non-filtered moves for that player.</returns>
+    /// <remarks>
+    /// Runtime: O(p * c), where p is the number of active pieces and c is the number of raw targets per piece. In the loose
+    /// chess worst case this loops through at most 16 active pieces and collects up to about 27 targets per piece. 432
+    /// </remarks>
     public List<Move> GetAllPossibleMoves(string player)
     {
         return GetMoves(player, false);
@@ -127,6 +207,9 @@ public class GameState
     /// Gets all raw moves for the current player before king-safety filtering.
     /// </summary>
     /// <returns>All non-filtered moves for the current player.</returns>
+    /// <remarks>
+    /// Runtime: Same as GetAllPossibleMoves(string). It still loops through at most 16 active pieces.
+    /// </remarks>
     public List<Move> GetAllPossibleMoves()
     {
         return GetAllPossibleMoves(CurrentPlayer);
@@ -137,6 +220,11 @@ public class GameState
     /// </summary>
     /// <param name="piece">The piece to inspect.</param>
     /// <returns>The move squares and attack squares for that piece.</returns>
+    /// <remarks>
+    /// Runtime: O(n) in the heaviest sliding-piece case, where n is the board width. The slowest branch is queen-style
+    /// scanning, which checks up to 8 directions and at most 7 squares in each direction, so up to 56 ray steps on an 8x8
+    /// board.
+    /// </remarks>
     public (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetPieceMoves(PieceState piece)
     {
         if (piece == null || !piece.IsActive)
@@ -157,6 +245,10 @@ public class GameState
     /// </summary>
     /// <param name="piece">The piece to inspect.</param>
     /// <returns>The legal move squares and legal attack squares for that piece.</returns>
+    /// <remarks>
+    /// Runtime: O(c * safetyCheck), where c is the number of raw targets for the piece. In the heaviest case a queen can
+    /// produce up to 27 candidate squares, and each one is tested with IsMoveSafe.
+    /// </remarks>
     public (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetAllLegalMoves(PieceState piece)
     {
         var (moveSquares, attackSquares) = GetPieceMoves(piece);
@@ -187,6 +279,10 @@ public class GameState
     /// </summary>
     /// <param name="player">The player color.</param>
     /// <returns>True if that player has a legal move.</returns>
+    /// <remarks>
+    /// Runtime: O(p * legalMoveCost). In the worst case this checks all 16 active pieces before finding a legal move or
+    /// deciding there are none.
+    /// </remarks>
     public bool AnyLegalMoves(string player)
     {
         foreach (var piece in GetActivePieces(player))
@@ -206,6 +302,10 @@ public class GameState
     /// </summary>
     /// <param name="move">The move to simulate.</param>
     /// <returns>A new state after the move has been made.</returns>
+    /// <remarks>
+    /// Runtime: O(p). It first checks whether the move is an attack, then deep-copies the state. In a normal chess game
+    /// that means up to 32 piece clones and up to 32 board placements.
+    /// </remarks>
     public GameState ApplyMove(Move move)
     {
         return ApplyMove(move, IsAttackMove(move));
@@ -217,10 +317,13 @@ public class GameState
     /// <param name="move">The move to simulate.</param>
     /// <param name="isAttack">Whether the move captures a piece.</param>
     /// <returns>A new state after the move has been made.</returns>
+    /// <remarks>
+    /// Runtime: O(p), where p is the number of stored pieces. It deep-copies up to 32 piece states and fills the board array
+    /// during the same copy pass, then applies the move in constant time.
+    /// </remarks>
     public GameState ApplyMove(Move move, bool isAttack)
     {
-        var nextState = new GameState(ClonePieceStates(PlayerWhite), ClonePieceStates(PlayerBlack), CurrentPlayer,
-            GameOver, EnPassantTargetSquare);
+        var nextState = new GameState(this);
 
         nextState.ApplyMoveInternal(move, isAttack);
         return nextState;
@@ -231,6 +334,9 @@ public class GameState
     /// </summary>
     /// <param name="move">The move to inspect.</param>
     /// <returns>True if the move captures a piece.</returns>
+    /// <remarks>
+    /// Runtime: O(1). This does at most two board lookups and a small en passant comparison.
+    /// </remarks>
     public bool IsAttackMove(Move move)
     {
         if (GetPosition(move.GetMatrixX(), move.GetMatrixY()) != null)
@@ -254,27 +360,27 @@ public class GameState
     /// </summary>
     /// <param name="player">The player color.</param>
     /// <returns>True if the king is in check.</returns>
+    /// <remarks>
+    /// Runtime: O(p * attackGen). The king lookup is cached, so this only checks attacks from up to 16 opponent pieces. Each
+    /// opponent piece generates attacks once, with the heaviest queen-style scan reaching up to 56 ray steps.
+    /// </remarks>
     public bool IsKingInCheck(string player)
     {
-        PieceState king = null;
-        foreach (var piece in GetActivePieces(player))
-        {
-            if (piece.IsKing)
-            {
-                king = piece;
-                break;
-            }
-        }
-
+        PieceState king = player == "white" ? _whiteKing : _blackKing;
         if (king == null)
         {
             return false;
         }
 
-        var opponent = player == "white" ? "black" : "white";
-        foreach (var piece in GetActivePieces(opponent))
+        if (!king.IsActive)
         {
-            if (piece.IsKing)
+            return false;
+        }
+
+        var opponent = player == "white" ? "black" : "white";
+        foreach (var piece in GetPieces(opponent))
+        {
+            if (piece.IsKing || !piece.IsActive)
             {
                 continue;
             }
@@ -297,6 +403,9 @@ public class GameState
     /// </summary>
     /// <param name="move">The move to apply.</param>
     /// <param name="isAttack">Whether the move captures a piece.</param>
+    /// <remarks>
+    /// Runtime: O(1). This updates a few board squares and runs only constant-size castling, en passant, and promotion checks.
+    /// </remarks>
     private void ApplyMoveInternal(Move move, bool isAttack)
     {
         var movingPiece = GetPosition(move.GetFromMatrixX(), move.GetFromMatrixY());
@@ -356,34 +465,15 @@ public class GameState
     /// <param name="movingPiece">The piece that is moving.</param>
     /// <param name="matrixX">The target x coordinate.</param>
     /// <param name="matrixY">The target y coordinate.</param>
+    /// <remarks>
+    /// Runtime: O(1). This checks the target square once and, for en passant, at most one extra pawn square.
+    /// </remarks>
     private void HandleAttack(PieceState movingPiece, int matrixX, int matrixY)
     {
-        var capturedPiece = GetPosition(matrixX, matrixY);
+        var capturedPiece = GetCapturedPieceForMove(movingPiece, matrixX, matrixY);
         if (capturedPiece != null)
         {
             CapturePiece(capturedPiece);
-            return;
-        }
-
-        if (!movingPiece.IsPawn || !EnPassantTargetSquare.HasValue)
-        {
-            return;
-        }
-
-        var enPassantTarget = EnPassantTargetSquare.Value;
-        var direction = movingPiece.Player == "white" ? 1 : -1;
-        var isDiagonalPawnMove = matrixX != movingPiece.MatrixX &&
-                                 matrixY - movingPiece.MatrixY == direction;
-
-        if (!isDiagonalPawnMove || enPassantTarget.x != matrixX || enPassantTarget.y != movingPiece.MatrixY)
-        {
-            return;
-        }
-
-        var enPassantPawn = GetPosition(enPassantTarget.x, enPassantTarget.y);
-        if (enPassantPawn != null && enPassantPawn.IsPawn && enPassantPawn.Player != movingPiece.Player)
-        {
-            CapturePiece(enPassantPawn);
         }
     }
 
@@ -391,6 +481,9 @@ public class GameState
     /// Marks a piece as captured and removes it from the board.
     /// </summary>
     /// <param name="piece">The piece to capture.</param>
+    /// <remarks>
+    /// Runtime: O(1). One board removal and one flag update.
+    /// </remarks>
     private void CapturePiece(PieceState piece)
     {
         _positions[piece.MatrixX, piece.MatrixY] = null;
@@ -403,6 +496,9 @@ public class GameState
     /// <param name="kingFromX">The king's starting x coordinate.</param>
     /// <param name="kingY">The king's row.</param>
     /// <param name="kingToX">The king's target x coordinate.</param>
+    /// <remarks>
+    /// Runtime: O(1). This does one rook lookup and one rook reposition.
+    /// </remarks>
     private void MoveRookAfterCastlingMove(int kingFromX, int kingY, int kingToX)
     {
         var isRightRook = kingToX > kingFromX;
@@ -425,6 +521,9 @@ public class GameState
     /// <summary>
     /// Rebuilds the board array from the stored piece lists.
     /// </summary>
+    /// <remarks>
+    /// Runtime: O(p), where p is the number of stored pieces. In this project it visits at most 32 piece states.
+    /// </remarks>
     private void RebuildPositions()
     {
         foreach (var piece in PlayerWhite)
@@ -442,8 +541,13 @@ public class GameState
     /// Places one active piece on the board array.
     /// </summary>
     /// <param name="piece">The piece to place.</param>
+    /// <remarks>
+    /// Runtime: O(1). This only checks whether the piece is active and then assigns one array slot.
+    /// </remarks>
     private void AddPieceToBoard(PieceState piece)
     {
+        CacheKing(piece);
+
         if (!piece.IsActive)
         {
             return;
@@ -457,9 +561,13 @@ public class GameState
     /// </summary>
     /// <param name="pieces">The live pieces to copy.</param>
     /// <returns>The copied piece states.</returns>
+    /// <remarks>
+    /// Runtime: O(p), where p is the number of provided GameObjects. When called from GameState(Game), this loops through at
+    /// most 16 pieces for one side.
+    /// </remarks>
     private static List<PieceState> CreatePieceStates(IEnumerable<GameObject> pieces)
     {
-        var pieceStates = new List<PieceState>();
+        var pieceStates = new List<PieceState>(16);
 
         foreach (var gameObject in pieces)
         {
@@ -481,27 +589,13 @@ public class GameState
     }
 
     /// <summary>
-    /// Creates deep copies of stored piece states.
-    /// </summary>
-    /// <param name="pieces">The piece states to clone.</param>
-    /// <returns>A new list with cloned piece states.</returns>
-    private static List<PieceState> ClonePieceStates(IEnumerable<PieceState> pieces)
-    {
-        var clones = new List<PieceState>();
-
-        foreach (var piece in pieces)
-        {
-            clones.Add(piece.Clone());
-        }
-
-        return clones;
-    }
-
-    /// <summary>
     /// Gets the en passant target square from the live game.
     /// </summary>
     /// <param name="game">The live game to inspect.</param>
     /// <returns>The en passant target square, or null.</returns>
+    /// <remarks>
+    /// Runtime: O(1). This does one getter call and one null check.
+    /// </remarks>
     private static Vector2Int? GetEnPassantTargetSquare(Game game)
     {
         var enPassantTarget = game.GetEnPassentTarget();
@@ -513,12 +607,65 @@ public class GameState
         return new Vector2Int(enPassantTarget.GetxBoard(), enPassantTarget.GetyBoard());
     }
 
+    /// <summary>
+    /// Clones a piece list into this state and fills the board array during the same pass.
+    /// </summary>
+    /// <param name="source">The source pieces to copy.</param>
+    /// <param name="destination">The destination list.</param>
+    /// <remarks>
+    /// Runtime: O(p), where p is the number of source pieces. In this project that is at most 16 pieces per side.
+    /// </remarks>
+    private void ClonePiecesIntoState(IEnumerable<PieceState> source, List<PieceState> destination)
+    {
+        foreach (var piece in source)
+        {
+            var clone = piece.Clone();
+            destination.Add(clone);
+            AddPieceToBoard(clone);
+        }
+    }
+
+    /// <summary>
+    /// Caches the king reference for faster check detection.
+    /// </summary>
+    /// <param name="piece">The piece to inspect.</param>
+    /// <remarks>
+    /// Runtime: O(1). This does one piece-type check and stores one reference when the piece is a king.
+    /// </remarks>
+    private void CacheKing(PieceState piece)
+    {
+        if (!piece.IsKing)
+        {
+            return;
+        }
+
+        if (piece.Player == "white")
+        {
+            _whiteKing = piece;
+            return;
+        }
+
+        _blackKing = piece;
+    }
+
+    /// <summary>
+    /// Gets either raw moves or legal moves for one player.
+    /// </summary>
+    /// <param name="player">The player color.</param>
+    /// <param name="legalOnly">True to filter out moves that leave the king in check.</param>
+    /// <returns>The collected moves for that player.</returns>
+    /// <remarks>
+    /// Runtime: O(p * c) for raw moves and O(p * c * safetyCheck) for legal moves. In the loose chess worst case this loops
+    /// through at most 16 active pieces and can inspect up to about 27 candidate targets per piece. 432
+    /// </remarks>
     private List<Move> GetMoves(string player, bool legalOnly)
     {
         var possibleMoves = new List<Move>();
 
-        foreach (var piece in GetActivePieces(player))
+        foreach (var piece in GetPieces(player))
         {
+            if(!piece.IsActive) continue;
+
             (List<Vector2Int> pieceMoves, List<Vector2Int> pieceAttacks) = legalOnly
                 ? GetAllLegalMoves(piece)
                 : GetPieceMoves(piece);
@@ -537,13 +684,36 @@ public class GameState
         return possibleMoves;
     }
 
+    /// <summary>
+    /// Checks whether moving one piece to a target square keeps that player's king safe.
+    /// </summary>
+    /// <param name="piece">The piece to test.</param>
+    /// <param name="x">The target x coordinate.</param>
+    /// <param name="y">The target y coordinate.</param>
+    /// <returns>True if the move does not leave the king in check.</returns>
+    /// <remarks>
+    /// Runtime: O(checkCost). This applies the move in place, runs one IsKingInCheck call, and then undoes the move again, so
+    /// it avoids cloning the whole GameState for each candidate move.
+    /// </remarks>
     private bool IsMoveSafe(PieceState piece, int x, int y)
     {
         var move = new Move(piece.MatrixX, piece.MatrixY, x, y, IsAttackMove(piece, x, y));
-        var nextState = ApplyMove(move, move.GetIsAttack());
-        return !nextState.IsKingInCheck(piece.Player);
+        var undoState = ApplyTemporaryMove(move, move.GetIsAttack());
+        bool isSafe = !IsKingInCheck(piece.Player);
+        UndoTemporaryMove(undoState);
+        return isSafe;
     }
 
+    /// <summary>
+    /// Checks whether a piece-state move should be treated as an attack.
+    /// </summary>
+    /// <param name="piece">The moving piece.</param>
+    /// <param name="x">The target x coordinate.</param>
+    /// <param name="y">The target y coordinate.</param>
+    /// <returns>True if the move captures a piece.</returns>
+    /// <remarks>
+    /// Runtime: O(1). This does at most one board lookup and the constant-size en passant comparison.
+    /// </remarks>
     private bool IsAttackMove(PieceState piece, int x, int y)
     {
         if (GetPosition(x, y) != null)
@@ -561,6 +731,207 @@ public class GameState
                EnPassantTargetSquare.Value.y == piece.MatrixY;
     }
 
+    /// <summary>
+    /// Gets the piece that would be captured by a move, including en passant.
+    /// </summary>
+    /// <param name="movingPiece">The piece that is moving.</param>
+    /// <param name="matrixX">The target x coordinate.</param>
+    /// <param name="matrixY">The target y coordinate.</param>
+    /// <returns>The captured piece, or null if the move is not a capture.</returns>
+    /// <remarks>
+    /// Runtime: O(1). This checks the target square once and, for en passant, at most one extra pawn square.
+    /// </remarks>
+    private PieceState GetCapturedPieceForMove(PieceState movingPiece, int matrixX, int matrixY)
+    {
+        var capturedPiece = GetPosition(matrixX, matrixY);
+        if (capturedPiece != null)
+        {
+            return capturedPiece;
+        }
+
+        if (!movingPiece.IsPawn || !EnPassantTargetSquare.HasValue)
+        {
+            return null;
+        }
+
+        var enPassantTarget = EnPassantTargetSquare.Value;
+        var direction = movingPiece.Player == "white" ? 1 : -1;
+        var isDiagonalPawnMove = matrixX != movingPiece.MatrixX &&
+                                 matrixY - movingPiece.MatrixY == direction;
+
+        if (!isDiagonalPawnMove || enPassantTarget.x != matrixX || enPassantTarget.y != movingPiece.MatrixY)
+        {
+            return null;
+        }
+
+        var enPassantPawn = GetPosition(enPassantTarget.x, enPassantTarget.y);
+        if (enPassantPawn != null && enPassantPawn.IsPawn && enPassantPawn.Player != movingPiece.Player)
+        {
+            return enPassantPawn;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Applies a move directly to this state so it can be checked and then undone.
+    /// </summary>
+    /// <param name="move">The move to apply temporarily.</param>
+    /// <param name="isAttack">Whether the move captures a piece.</param>
+    /// <returns>The information needed to undo the move again.</returns>
+    /// <remarks>
+    /// Runtime: O(1). This only updates the touched pieces and board squares, without cloning the whole state.
+    /// </remarks>
+    private MoveUndoState ApplyTemporaryMove(Move move, bool isAttack)
+    {
+        var movingPiece = GetPosition(move.GetFromMatrixX(), move.GetFromMatrixY());
+        if (movingPiece == null)
+        {
+            throw new InvalidOperationException("No piece found on the move's starting square.");
+        }
+
+        PieceState capturedPiece = null;
+        int capturedX = -1;
+        int capturedY = -1;
+        bool capturedWasActive = false;
+
+        if (isAttack)
+        {
+            capturedPiece = GetCapturedPieceForMove(movingPiece, move.GetMatrixX(), move.GetMatrixY());
+            if (capturedPiece != null)
+            {
+                capturedX = capturedPiece.MatrixX;
+                capturedY = capturedPiece.MatrixY;
+                capturedWasActive = capturedPiece.IsActive;
+                _positions[capturedX, capturedY] = null;
+                capturedPiece.IsActive = false;
+            }
+        }
+
+        var undoState = new MoveUndoState
+        {
+            MovingPiece = movingPiece,
+            MovingFromX = movingPiece.MatrixX,
+            MovingFromY = movingPiece.MatrixY,
+            MovingHadMoved = movingPiece.HasMoved,
+            MovingOriginalName = movingPiece.Name,
+            CapturedPiece = capturedPiece,
+            CapturedX = capturedX,
+            CapturedY = capturedY,
+            CapturedWasActive = capturedWasActive,
+            PreviousEnPassantTargetSquare = EnPassantTargetSquare,
+            PreviousCurrentPlayer = CurrentPlayer
+        };
+
+        _positions[undoState.MovingFromX, undoState.MovingFromY] = null;
+        movingPiece.MatrixX = move.GetMatrixX();
+        movingPiece.MatrixY = move.GetMatrixY();
+        _positions[movingPiece.MatrixX, movingPiece.MatrixY] = movingPiece;
+
+        PieceState castlingRook = null;
+        int castlingRookFromX = -1;
+        int castlingRookFromY = -1;
+        bool castlingRookHadMoved = false;
+
+        if (movingPiece.IsKing)
+        {
+            movingPiece.HasMoved = true;
+            if (Math.Abs(undoState.MovingFromX - move.GetMatrixX()) == 2)
+            {
+                bool isRightRook = move.GetMatrixX() > undoState.MovingFromX;
+                castlingRookFromX = isRightRook ? undoState.MovingFromX + 3 : undoState.MovingFromX - 4;
+                castlingRookFromY = undoState.MovingFromY;
+                int rookToX = isRightRook ? move.GetMatrixX() - 1 : move.GetMatrixX() + 1;
+
+                castlingRook = GetPosition(castlingRookFromX, castlingRookFromY);
+                if (castlingRook != null)
+                {
+                    castlingRookHadMoved = castlingRook.HasMoved;
+                    _positions[castlingRookFromX, castlingRookFromY] = null;
+                    castlingRook.MatrixX = rookToX;
+                    castlingRook.MatrixY = castlingRookFromY;
+                    castlingRook.HasMoved = true;
+                    _positions[castlingRook.MatrixX, castlingRook.MatrixY] = castlingRook;
+                }
+            }
+        }
+        else if (movingPiece.IsRook)
+        {
+            movingPiece.HasMoved = true;
+        }
+
+        if (movingPiece.IsPawn && Math.Abs(undoState.MovingFromY - move.GetMatrixY()) == 2)
+        {
+            EnPassantTargetSquare = new Vector2Int(movingPiece.MatrixX, movingPiece.MatrixY);
+        }
+        else
+        {
+            EnPassantTargetSquare = null;
+        }
+
+        if (movingPiece.IsPawn && (movingPiece.MatrixY == 0 || movingPiece.MatrixY == 7))
+        {
+            movingPiece.PromoteToQueen();
+        }
+
+        CurrentPlayer = CurrentPlayer == "white" ? "black" : "white";
+
+        undoState.CastlingRook = castlingRook;
+        undoState.CastlingRookFromX = castlingRookFromX;
+        undoState.CastlingRookFromY = castlingRookFromY;
+        undoState.CastlingRookHadMoved = castlingRookHadMoved;
+
+        return undoState;
+    }
+
+    /// <summary>
+    /// Restores a temporarily applied move.
+    /// </summary>
+    /// <param name="undoState">The stored information from ApplyTemporaryMove.</param>
+    /// <remarks>
+    /// Runtime: O(1). This only restores the touched pieces and board squares.
+    /// </remarks>
+    private void UndoTemporaryMove(MoveUndoState undoState)
+    {
+        CurrentPlayer = undoState.PreviousCurrentPlayer;
+        EnPassantTargetSquare = undoState.PreviousEnPassantTargetSquare;
+
+        if (undoState.CastlingRook != null)
+        {
+            _positions[undoState.CastlingRook.MatrixX, undoState.CastlingRook.MatrixY] = null;
+            undoState.CastlingRook.MatrixX = undoState.CastlingRookFromX;
+            undoState.CastlingRook.MatrixY = undoState.CastlingRookFromY;
+            undoState.CastlingRook.HasMoved = undoState.CastlingRookHadMoved;
+            _positions[undoState.CastlingRookFromX, undoState.CastlingRookFromY] = undoState.CastlingRook;
+        }
+
+        _positions[undoState.MovingPiece.MatrixX, undoState.MovingPiece.MatrixY] = null;
+        undoState.MovingPiece.MatrixX = undoState.MovingFromX;
+        undoState.MovingPiece.MatrixY = undoState.MovingFromY;
+        undoState.MovingPiece.HasMoved = undoState.MovingHadMoved;
+        undoState.MovingPiece.SetName(undoState.MovingOriginalName);
+        _positions[undoState.MovingFromX, undoState.MovingFromY] = undoState.MovingPiece;
+
+        if (undoState.CapturedPiece != null)
+        {
+            undoState.CapturedPiece.MatrixX = undoState.CapturedX;
+            undoState.CapturedPiece.MatrixY = undoState.CapturedY;
+            undoState.CapturedPiece.IsActive = undoState.CapturedWasActive;
+            _positions[undoState.CapturedX, undoState.CapturedY] = undoState.CapturedPiece;
+        }
+    }
+
+    /// <summary>
+    /// Walks in one straight direction until the path is blocked or leaves the board.
+    /// </summary>
+    /// <param name="xIncrement">The x step for each square.</param>
+    /// <param name="yIncrement">The y step for each square.</param>
+    /// <param name="piece">The piece that is looking along the line.</param>
+    /// <returns>The empty move squares and the first enemy square, if one exists.</returns>
+    /// <remarks>
+    /// Runtime: O(n), where n is the board width. On an 8x8 board this walks at most 7 squares in one direction before it
+    /// stops.
+    /// </remarks>
     private (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) CanSeeInLine(int xIncrement,
         int yIncrement, PieceState piece)
     {
@@ -589,6 +960,16 @@ public class GameState
         return (movableSquares, attackableSquares);
     }
 
+    /// <summary>
+    /// Checks a single target square for a normal move or attack.
+    /// </summary>
+    /// <param name="x">The target x coordinate.</param>
+    /// <param name="y">The target y coordinate.</param>
+    /// <param name="piece">The piece that is checking the square.</param>
+    /// <returns>The move square if it is empty, or the attack square if it holds an enemy piece.</returns>
+    /// <remarks>
+    /// Runtime: O(1). This does one bounds check and one board lookup.
+    /// </remarks>
     private (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) CanSeePoint(int x, int y,
         PieceState piece)
     {
@@ -613,6 +994,15 @@ public class GameState
         return (movableSquares, attackableSquares);
     }
 
+    /// <summary>
+    /// Gets the raw king moves, including castling when allowed.
+    /// </summary>
+    /// <param name="piece">The king piece state.</param>
+    /// <returns>The king's move squares and attack squares.</returns>
+    /// <remarks>
+    /// Runtime: O(1) for the 8 neighboring squares, with extra castling checks when the king has not moved. In the castling
+    /// case this also does 1 IsKingInCheck call and up to 4 IsMoveSafe simulations.
+    /// </remarks>
     private (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetKingMoves(PieceState piece)
     {
         var moveSquares = new List<Vector2Int>();
@@ -672,6 +1062,15 @@ public class GameState
         return (moveSquares, attackSquares);
     }
 
+    /// <summary>
+    /// Gets the raw queen moves by combining rook and bishop style lines.
+    /// </summary>
+    /// <param name="piece">The queen piece state.</param>
+    /// <returns>The queen's move squares and attack squares.</returns>
+    /// <remarks>
+    /// Runtime: O(n), where n is the board width. On an 8x8 board this scans 8 directions and walks at most 56 ray steps in
+    /// total.
+    /// </remarks>
     private (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetQueenMoves(PieceState piece)
     {
         var moveSquares = new List<Vector2Int>();
@@ -693,6 +1092,15 @@ public class GameState
         return (moveSquares, attackSquares);
     }
 
+    /// <summary>
+    /// Gets the raw rook moves.
+    /// </summary>
+    /// <param name="piece">The rook piece state.</param>
+    /// <returns>The rook's move squares and attack squares.</returns>
+    /// <remarks>
+    /// Runtime: O(n), where n is the board width. On an 8x8 board this scans 4 directions and walks at most 28 ray steps in
+    /// total.
+    /// </remarks>
     private (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetRookMoves(PieceState piece)
     {
         var moveSquares = new List<Vector2Int>();
@@ -713,6 +1121,15 @@ public class GameState
         return (moveSquares, attackSquares);
     }
 
+    /// <summary>
+    /// Gets the raw bishop moves.
+    /// </summary>
+    /// <param name="piece">The bishop piece state.</param>
+    /// <returns>The bishop's move squares and attack squares.</returns>
+    /// <remarks>
+    /// Runtime: O(n), where n is the board width. On an 8x8 board this scans 4 diagonals and walks at most 28 ray steps in
+    /// total.
+    /// </remarks>
     private (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetBishopMoves(PieceState piece)
     {
         var moveSquares = new List<Vector2Int>();
@@ -733,6 +1150,14 @@ public class GameState
         return (moveSquares, attackSquares);
     }
 
+    /// <summary>
+    /// Gets the raw knight moves.
+    /// </summary>
+    /// <param name="piece">The knight piece state.</param>
+    /// <returns>The knight's move squares and attack squares.</returns>
+    /// <remarks>
+    /// Runtime: O(1). This checks the 8 knight jump targets once each.
+    /// </remarks>
     private (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetKnightMoves(PieceState piece)
     {
         var moveSquares = new List<Vector2Int>();
@@ -754,6 +1179,14 @@ public class GameState
         return (moveSquares, attackSquares);
     }
 
+    /// <summary>
+    /// Gets the raw pawn moves, captures, and en passant attacks.
+    /// </summary>
+    /// <param name="piece">The pawn piece state.</param>
+    /// <returns>The pawn's move squares and attack squares.</returns>
+    /// <remarks>
+    /// Runtime: O(1). This checks up to 2 forward squares, 2 diagonal captures, and the constant-size en passant case.
+    /// </remarks>
     private (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) GetPawnMoves(PieceState piece)
     {
         var moveSquares = new List<Vector2Int>();
@@ -815,6 +1248,9 @@ public class GameState
     }
 }
 
+/// <summary>
+/// A lightweight snapshot of one chess piece used inside GameState.
+/// </summary>
 public class PieceState
 {
     public string Name { get; private set; }
@@ -832,6 +1268,19 @@ public class PieceState
     public bool IsQueen => Name.EndsWith("queen");
     public bool IsKing => Name.EndsWith("king");
 
+    /// <summary>
+    /// Creates one stored piece snapshot.
+    /// </summary>
+    /// <param name="name">The piece name.</param>
+    /// <param name="player">The owning player.</param>
+    /// <param name="matrixX">The board x coordinate.</param>
+    /// <param name="matrixY">The board y coordinate.</param>
+    /// <param name="isActive">Whether the piece is still on the board.</param>
+    /// <param name="hasMoved">Whether the piece has moved before.</param>
+    /// <param name="isInCheck">Whether the piece is currently in check.</param>
+    /// <remarks>
+    /// Runtime: O(1). This only stores the provided values.
+    /// </remarks>
     private PieceState(string name, string player, int matrixX, int matrixY, bool isActive, bool hasMoved,
         bool isInCheck)
     {
@@ -844,17 +1293,40 @@ public class PieceState
         IsInCheck = isInCheck;
     }
 
+    /// <summary>
+    /// Creates a PieceState from one live Unity piece.
+    /// </summary>
+    /// <param name="piece">The live piece to copy.</param>
+    /// <param name="isActive">Whether the piece is active in the scene.</param>
+    /// <returns>The copied piece state.</returns>
+    /// <remarks>
+    /// Runtime: O(1). This reads one live piece and does only constant-size king and rook state checks.
+    /// </remarks>
     public static PieceState FromPiece(Piece piece, bool isActive)
     {
         return new PieceState(piece.name, piece.GetPlayer(), piece.GetxBoard(), piece.GetyBoard(), isActive,
             GetHasMoved(piece), GetIsInCheck(piece));
     }
 
+    /// <summary>
+    /// Creates a deep copy of this stored piece state.
+    /// </summary>
+    /// <returns>A copied piece state.</returns>
+    /// <remarks>
+    /// Runtime: O(1). This creates one new PieceState with the same values.
+    /// </remarks>
     public PieceState Clone()
     {
         return new PieceState(Name, Player, MatrixX, MatrixY, IsActive, HasMoved, IsInCheck);
     }
 
+    /// <summary>
+    /// Gets the material value used by the AI evaluation.
+    /// </summary>
+    /// <returns>The piece value.</returns>
+    /// <remarks>
+    /// Runtime: O(1). This does at most 6 piece-type checks.
+    /// </remarks>
     public int GetWorth()
     {
         if (IsPawn) return 1;
@@ -866,11 +1338,37 @@ public class PieceState
         return 0;
     }
 
+    /// <summary>
+    /// Changes this stored pawn into a queen.
+    /// </summary>
+    /// <remarks>
+    /// Runtime: O(1). This only updates the stored name.
+    /// </remarks>
     public void PromoteToQueen()
     {
         Name = Player + "_queen";
     }
 
+    /// <summary>
+    /// Restores the stored piece name.
+    /// </summary>
+    /// <param name="name">The name to store.</param>
+    /// <remarks>
+    /// Runtime: O(1). This only updates the stored name.
+    /// </remarks>
+    public void SetName(string name)
+    {
+        Name = name;
+    }
+
+    /// <summary>
+    /// Reads whether a live king or rook has moved.
+    /// </summary>
+    /// <param name="piece">The live piece to inspect.</param>
+    /// <returns>True if the piece tracks itself as moved.</returns>
+    /// <remarks>
+    /// Runtime: O(1). This does at most two type checks and one getter call.
+    /// </remarks>
     private static bool GetHasMoved(Piece piece)
     {
         if (piece is King king)
@@ -886,6 +1384,14 @@ public class PieceState
         return false;
     }
 
+    /// <summary>
+    /// Reads whether a live king is currently in check.
+    /// </summary>
+    /// <param name="piece">The live piece to inspect.</param>
+    /// <returns>True if the piece is a king in check.</returns>
+    /// <remarks>
+    /// Runtime: O(1). This does one type check and one getter call.
+    /// </remarks>
     private static bool GetIsInCheck(Piece piece)
     {
         if (piece is King king)
