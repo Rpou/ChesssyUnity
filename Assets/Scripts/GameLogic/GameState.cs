@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.InteropServices;
 using UnityEngine;
 
 /// <summary>
@@ -7,9 +9,32 @@ using UnityEngine;
 /// </summary>
 public class GameState
 {
+    private static readonly Vector2Int[] OrthogonalDirections =
+    {
+        new Vector2Int(1, 0), new Vector2Int(-1, 0), new Vector2Int(0, 1), new Vector2Int(0, -1)
+    };
+
+    private static readonly Vector2Int[] DiagonalDirections =
+    {
+        new Vector2Int(1, 1), new Vector2Int(1, -1), new Vector2Int(-1, 1), new Vector2Int(-1, -1)
+    };
+
+    private static readonly Vector2Int[] KnightOffsets =
+    {
+        new Vector2Int(1, 2), new Vector2Int(2, 1), new Vector2Int(2, -1), new Vector2Int(1, -2),
+        new Vector2Int(-1, -2), new Vector2Int(-2, -1), new Vector2Int(-2, 1), new Vector2Int(-1, 2)
+    };
+
+    private static readonly Vector2Int[] KingOffsets =
+    {
+        new Vector2Int(1, 0), new Vector2Int(1, 1), new Vector2Int(0, 1), new Vector2Int(-1, 1),
+        new Vector2Int(-1, 0), new Vector2Int(-1, -1), new Vector2Int(0, -1), new Vector2Int(1, -1)
+    };
+
     private readonly PieceState[,] _positions = new PieceState[8, 8];
     private PieceState _whiteKing;
     private PieceState _blackKing;
+    private bool _disableMoveCache;
 
     private sealed class MoveUndoState
     {
@@ -28,6 +53,7 @@ public class GameState
         public bool CastlingRookHadMoved { get; set; }
         public Vector2Int? PreviousEnPassantTargetSquare { get; set; }
         public string PreviousCurrentPlayer { get; set; }
+        public bool PreviousDisableMoveCache { get; set; }
     }
 
     public List<PieceState> PlayerWhite { get; }
@@ -35,6 +61,10 @@ public class GameState
     public string CurrentPlayer { get; private set; }
     public bool GameOver { get; private set; }
     public Vector2Int? EnPassantTargetSquare { get; private set; }
+
+    private readonly Dictionary<PieceState, (List<Vector2Int> moves, List<Vector2Int> attacks)> moveCache
+    = new();
+
 
     /// <summary>
     /// Creates a new game state from the current live game.
@@ -126,6 +156,23 @@ public class GameState
         }
 
         return activePieces;
+    }
+
+    public void UpdateMoves()
+    {
+        moveCache.Clear();
+
+        foreach (var pieceST in PlayerWhite)
+        {
+            if (!pieceST.IsActive) continue;
+            GetPieceMoves(pieceST);
+        }
+
+        foreach (var pieceST in PlayerBlack)
+        {
+            if (!pieceST.IsActive) continue;
+            GetPieceMoves(pieceST);
+        }
     }
 
     /// <summary>
@@ -232,12 +279,19 @@ public class GameState
             return (new List<Vector2Int>(), new List<Vector2Int>());
         }
 
-        if (piece.IsPawn) return GetPawnMoves(piece);
-        if (piece.IsKnight) return GetKnightMoves(piece);
-        if (piece.IsBishop) return GetBishopMoves(piece);
-        if (piece.IsRook) return GetRookMoves(piece);
-        if (piece.IsQueen) return GetQueenMoves(piece);
-        return GetKingMoves(piece);
+        if (!_disableMoveCache && moveCache.TryGetValue(piece, out var cachedMoves))
+        {
+            return cachedMoves;
+        }
+
+        var calculatedMoves = CalculatePieceMoves(piece);
+
+        if (!_disableMoveCache)
+        {
+            moveCache[piece] = calculatedMoves;
+        }
+
+        return calculatedMoves;
     }
 
     /// <summary>
@@ -285,8 +339,10 @@ public class GameState
     /// </remarks>
     public bool AnyLegalMoves(string player)
     {
-        foreach (var piece in GetActivePieces(player))
+        foreach (var piece in GetPieces(player))
         {
+            if(!piece.IsActive) continue;
+             
             var (moveSquares, attackSquares) = GetAllLegalMoves(piece);
             if (moveSquares.Count != 0 || attackSquares.Count != 0)
             {
@@ -361,8 +417,8 @@ public class GameState
     /// <param name="player">The player color.</param>
     /// <returns>True if the king is in check.</returns>
     /// <remarks>
-    /// Runtime: O(p * attackGen). The king lookup is cached, so this only checks attacks from up to 16 opponent pieces. Each
-    /// opponent piece generates attacks once, with the heaviest queen-style scan reaching up to 56 ray steps.
+    /// Runtime: O(n), where n is the board width. On an 8x8 board this checks up to 2 pawn squares, 8 knight squares, 8 king
+    /// squares, and at most 56 sliding ray squares, for up to 74 board checks in the worst case.
     /// </remarks>
     public bool IsKingInCheck(string player)
     {
@@ -378,20 +434,106 @@ public class GameState
         }
 
         var opponent = player == "white" ? "black" : "white";
-        foreach (var piece in GetPieces(opponent))
-        {
-            if (piece.IsKing || !piece.IsActive)
-            {
-                continue;
-            }
 
-            var (_, attackSquares) = GetPieceMoves(piece);
-            foreach (var attack in attackSquares)
+        return IsSquareAttacked(king.MatrixX, king.MatrixY, opponent);
+    }
+
+    /// <summary>
+    /// Checks whether one square is attacked by the given player.
+    /// </summary>
+    /// <param name="x">The square x coordinate.</param>
+    /// <param name="y">The square y coordinate.</param>
+    /// <param name="attackingPlayer">The player whose attacks should be checked.</param>
+    /// <returns>True if one of that player's pieces attacks the square.</returns>
+    /// <remarks>
+    /// Runtime: O(n), where n is the board width. On an 8x8 board this checks up to 2 pawn squares, 8 knight squares, 8 king
+    /// squares, and at most 56 sliding ray squares, for up to 74 board checks in the worst case.
+    /// </remarks>
+    public bool IsSquareAttacked(int x, int y, string attackingPlayer)
+    {
+        if (!PositionOnBoard(x, y))
+        {
+            return false;
+        }
+
+        int pawnSourceY = attackingPlayer == "white" ? y - 1 : y + 1;
+
+        PieceState pawnRight = GetPosition(x + 1, pawnSourceY);
+        if (pawnRight != null && pawnRight.IsActive && pawnRight.Player == attackingPlayer && pawnRight.IsPawn)
+        {
+            return true;
+        }
+
+        PieceState pawnLeft = GetPosition(x - 1, pawnSourceY);
+        if (pawnLeft != null && pawnLeft.IsActive && pawnLeft.Player == attackingPlayer && pawnLeft.IsPawn)
+        {
+            return true;
+        }
+
+        foreach (var offset in KnightOffsets)
+        {
+            PieceState knight = GetPosition(x + offset.x, y + offset.y);
+            if (knight != null && knight.IsActive && knight.Player == attackingPlayer && knight.IsKnight)
             {
-                if (attack.x == king.MatrixX && attack.y == king.MatrixY)
+                return true;
+            }
+        }
+
+        foreach (var offset in KingOffsets)
+        {
+            PieceState king = GetPosition(x + offset.x, y + offset.y);
+            if (king != null && king.IsActive && king.Player == attackingPlayer && king.IsKing)
+            {
+                return true;
+            }
+        }
+
+        return IsSlidingAttack(x, y, attackingPlayer, OrthogonalDirections, true) ||
+               IsSlidingAttack(x, y, attackingPlayer, DiagonalDirections, false);
+    }
+
+    /// <summary>
+    /// Checks whether a sliding attacker can see the target square along a set of directions.
+    /// </summary>
+    /// <param name="targetX">The attacked square x coordinate.</param>
+    /// <param name="targetY">The attacked square y coordinate.</param>
+    /// <param name="attackingPlayer">The player whose sliding pieces should be checked.</param>
+    /// <param name="directions">The directions to scan.</param>
+    /// <param name="rookLikeAttack">True for rook-or-queen lines, false for bishop-or-queen lines.</param>
+    /// <returns>True if a matching sliding piece attacks the square.</returns>
+    /// <remarks>
+    /// Runtime: O(n), where n is the board width. On an 8x8 board each call scans 4 rays and walks at most 28 squares before
+    /// it either finds a blocker or leaves the board.
+    /// </remarks>
+    private bool IsSlidingAttack(int targetX, int targetY, string attackingPlayer, Vector2Int[] directions,
+        bool rookLikeAttack)
+    {
+        foreach (var direction in directions)
+        {
+            int x = targetX + direction.x;
+            int y = targetY + direction.y;
+
+            while (PositionOnBoard(x, y))
+            {
+                PieceState piece = GetPosition(x, y);
+                if (piece == null)
                 {
-                    return true;
+                    x += direction.x;
+                    y += direction.y;
+                    continue;
                 }
+
+                if (!piece.IsActive || piece.Player != attackingPlayer)
+                {
+                    break;
+                }
+
+                if (rookLikeAttack)
+                {
+                    return piece.IsRook || piece.IsQueen;
+                }
+
+                return piece.IsBishop || piece.IsQueen;
             }
         }
 
@@ -408,6 +550,8 @@ public class GameState
     /// </remarks>
     private void ApplyMoveInternal(Move move, bool isAttack)
     {
+        moveCache.Clear();
+
         var movingPiece = GetPosition(move.GetFromMatrixX(), move.GetFromMatrixY());
         if (movingPiece == null)
         {
@@ -648,6 +792,16 @@ public class GameState
         _blackKing = piece;
     }
 
+    private (List<Vector2Int> movableSquares, List<Vector2Int> attackableSquares) CalculatePieceMoves(PieceState piece)
+    {
+        if (piece.IsPawn) return GetPawnMoves(piece);
+        if (piece.IsKnight) return GetKnightMoves(piece);
+        if (piece.IsBishop) return GetBishopMoves(piece);
+        if (piece.IsRook) return GetRookMoves(piece);
+        if (piece.IsQueen) return GetQueenMoves(piece);
+        return GetKingMoves(piece);
+    }
+
     /// <summary>
     /// Gets either raw moves or legal moves for one player.
     /// </summary>
@@ -820,8 +974,11 @@ public class GameState
             CapturedY = capturedY,
             CapturedWasActive = capturedWasActive,
             PreviousEnPassantTargetSquare = EnPassantTargetSquare,
-            PreviousCurrentPlayer = CurrentPlayer
+            PreviousCurrentPlayer = CurrentPlayer,
+            PreviousDisableMoveCache = _disableMoveCache
         };
+
+        _disableMoveCache = true;
 
         _positions[undoState.MovingFromX, undoState.MovingFromY] = null;
         movingPiece.MatrixX = move.GetMatrixX();
@@ -895,6 +1052,7 @@ public class GameState
     {
         CurrentPlayer = undoState.PreviousCurrentPlayer;
         EnPassantTargetSquare = undoState.PreviousEnPassantTargetSquare;
+        _disableMoveCache = undoState.PreviousDisableMoveCache;
 
         if (undoState.CastlingRook != null)
         {

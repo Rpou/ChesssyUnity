@@ -27,7 +27,7 @@ public class MinMax : AI
     }
 
     public bool isCutoff(int depth){
-        return depth > 3;
+        return depth > 1;
     }
     
     public EvalMove MaxValue(GameState game, int depth, int alpha, int beta){
