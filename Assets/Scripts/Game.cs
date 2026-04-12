@@ -23,17 +23,27 @@ public class Game : MonoBehaviour
     private List<string> moves;
     private string currentPlayer = "white";
     private bool gameOver = false;
+    private int halfmoveClock;
+    private int fullmoveNumber = 1;
 
     public bool whiteIsAI = true;
     public bool blackIsAI = true;
+    [SerializeField] private bool fastSimulationMode = true;
+    [SerializeField, Min(0f)] private float aiMoveDelaySeconds = 0f;
+    [SerializeField, Min(1)] private int maxAIMovesPerFrame = 1;
 
     public AI blackAI;
     public AI whiteAI;
     private bool aiIsMakingMove = false;
+    private GameLogScript gameLogScript;
+    private TextMeshProUGUI winnerText;
+    private TextMeshProUGUI restartText;
 
     void Start()
     {
         moves = new List<string>();
+        halfmoveClock = 0;
+        fullmoveNumber = 1;
         movePlate = Resources.Load<GameObject>("Objects/MovePlate");
         chessPiece = Resources.Load<GameObject>("Objects/ChessPiece");
         // Load the SpriteManager from Resources
@@ -68,6 +78,7 @@ public class Game : MonoBehaviour
             CreatePiece<Pawn>("black_pawn", 4, 6), CreatePiece<Pawn>("black_pawn", 5, 6),
             CreatePiece<Pawn>("black_pawn", 6, 6), CreatePiece<Pawn>("black_pawn", 7, 6)
         };
+        CacheSceneReferences();
         TryMakeAIMove();
     }
 
@@ -147,18 +158,82 @@ public class Game : MonoBehaviour
     private IEnumerator MakeAIMoveCoroutine()
     {
         aiIsMakingMove = true;
+        var moveFailed = false;
+        var movesThisFrame = 0;
 
-        // Small delay so the move feels visible
-        yield return new WaitForSeconds(0.0f);
-
-        if (!gameOver && IsCurrentPlayerAI())
+        while (!gameOver && IsCurrentPlayerAI())
         {
-            if (currentPlayer == "black") blackAI.MakeMove(this);
-            else whiteAI.MakeMove(this);
+            if (aiMoveDelaySeconds > 0f)
+            {
+                yield return new WaitForSeconds(aiMoveDelaySeconds);
+            }
+
+            if (gameOver || !IsCurrentPlayerAI())
+            {
+                break;
+            }
+
+            AI currentAIController = currentPlayer == "black" ? blackAI : whiteAI;
+            if (currentAIController == null)
+            {
+                Debug.LogError($"No AI assigned for {currentPlayer}.");
+                break;
+            }
+
+            string movingPlayer = currentPlayer;
+            currentAIController.MakeMove(this);
+
+            if (!gameOver && currentPlayer == movingPlayer)
+            {
+                Debug.LogWarning($"{currentAIController.GetType().Name} did not complete a move for {movingPlayer}.");
+                moveFailed = true;
+                break;
+            }
+
+            if (!ShouldContinueAIMoveLoop())
+            {
+                break;
+            }
+
+            movesThisFrame++;
+            if (movesThisFrame >= Mathf.Max(1, maxAIMovesPerFrame))
+            {
+                movesThisFrame = 0;
+                yield return null;
+            }
         }
 
         aiIsMakingMove = false;
-        TryMakeAIMove();
+        if (!moveFailed)
+        {
+            TryMakeAIMove();
+        }
+    }
+
+    private bool ShouldContinueAIMoveLoop()
+    {
+        return aiMoveDelaySeconds <= 0f && IsFastSimulationActive();
+    }
+
+    private void CacheSceneReferences()
+    {
+        GameObject sidePanelController = GameObject.Find("SidePanelController");
+        if (sidePanelController != null)
+        {
+            gameLogScript = sidePanelController.GetComponent<GameLogScript>();
+        }
+
+        GameObject winnerObject = GameObject.FindGameObjectWithTag("WinnerTag");
+        if (winnerObject != null)
+        {
+            winnerText = winnerObject.GetComponent<TextMeshProUGUI>();
+        }
+
+        GameObject restartObject = GameObject.FindGameObjectWithTag("RestartTag");
+        if (restartObject != null)
+        {
+            restartText = restartObject.GetComponent<TextMeshProUGUI>();
+        }
     }
 
     // worst case: 16 + 16*27(432) + 16 = 464
@@ -231,17 +306,16 @@ public class Game : MonoBehaviour
     public void Winner(string playerWinner)
     {
         gameOver = true;
-        if (playerWinner == null)
+        if (winnerText != null)
         {
-            GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<TextMeshProUGUI>().enabled = true;
-            GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<TextMeshProUGUI>().text = "it is a draw!";
+            winnerText.enabled = true;
+            winnerText.text = playerWinner == null ? "it is a draw!" : playerWinner + " is the winner";
         }
-        else
+
+        if (restartText != null)
         {
-            GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<TextMeshProUGUI>().enabled = true;
-            GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<TextMeshProUGUI>().text = playerWinner + " is the winner";
+            restartText.enabled = true;
         }
-        GameObject.FindGameObjectWithTag("RestartTag").GetComponent<TextMeshProUGUI>().enabled = true;
     }
 
     /// <summary>
@@ -294,6 +368,7 @@ public class Game : MonoBehaviour
         Piece piece = reference.GetComponent<Piece>();
         var beforeMoveX = reference.GetComponent<Piece>().GetxBoard();
         var beforeMoveY = reference.GetComponent<Piece>().GetyBoard();
+        var isFastSimulation = IsFastSimulationActive();
         
         if (attack)
         {
@@ -338,18 +413,35 @@ public class Game : MonoBehaviour
         {
             SetEnPassantTarget(null);
         }
-        CheckIfKingInCheck(GetCurrentPlayer());
-        
-        // Check if **opponent’s** king is in check before switching turns
         string opponent = GetCurrentPlayer() == "white" ? "black" : "white";
-        King king = CheckIfKingInCheck(opponent); // 464
-        var putInCheck = king != null;
-        var move = NotationCreater.CreateNotation(piece, beforeMoveX, beforeMoveY, 
-            matrixX, matrixY, putInCheck, attack, castled, this); // 202
-        AddMove(move);
-        GameObject.Find("SidePanelController").GetComponent<GameLogScript>().LogMove(this);
+        UpdateMoveCounters(piece, attack);
 
-        if (!AnyLegalMoves(opponent))
+        bool putInCheck;
+        bool opponentHasLegalMoves;
+
+        if (isFastSimulation)
+        {
+            var updatedState = GetGameState();
+            putInCheck = updatedState.IsKingInCheck(opponent);
+            opponentHasLegalMoves = updatedState.AnyLegalMoves(opponent);
+        }
+        else
+        {
+            CheckIfKingInCheck(GetCurrentPlayer());
+            King king = CheckIfKingInCheck(opponent); // 464
+            putInCheck = king != null;
+            string move = NotationCreater.CreateNotation(piece, beforeMoveX, beforeMoveY,
+                matrixX, matrixY, putInCheck, attack, castled, this); // 202
+            AddMove(move);
+            if (gameLogScript != null)
+            {
+                gameLogScript.LogMove(this);
+            }
+
+            opponentHasLegalMoves = AnyLegalMoves(opponent);
+        }
+
+        if (!opponentHasLegalMoves)
         {
             if (putInCheck) Winner(GetCurrentPlayer());
             else Winner(null);
@@ -361,7 +453,10 @@ public class Game : MonoBehaviour
         }
         
         NextTurn();
-        DestroyMovePlates(); // 16
+        if (!isFastSimulation)
+        {
+            DestroyMovePlates(); // 16
+        }
     }
 
     /// <summary>
@@ -388,7 +483,10 @@ public class Game : MonoBehaviour
                     isEnPassantCapture = true;
                     SetPositionEmpty(matrixX, enPassantY);
                     targetPosition.SetActive(false);
-                    Debug.Log("Destroying: " + possiblePiece.name);
+                    if (!IsFastSimulationActive())
+                    {
+                        Debug.Log("Destroying: " + possiblePiece.name);
+                    }
                     Destroy(targetPosition);
                 }
             }
@@ -397,7 +495,10 @@ public class Game : MonoBehaviour
         if (!isEnPassantCapture && cp != null)
         {
             cp.SetActive(false);
-            Debug.Log("Destroying: " + cp.name);
+            if (!IsFastSimulationActive())
+            {
+                Debug.Log("Destroying: " + cp.name);
+            }
             Destroy(cp);
         }
         
@@ -509,6 +610,11 @@ public class Game : MonoBehaviour
         return gameOver;
     }
 
+    public bool IsFastSimulationActive()
+    {
+        return fastSimulationMode && whiteIsAI && blackIsAI;
+    }
+
     public void AddMove(string move)
     {
         moves.Add(move);
@@ -517,6 +623,16 @@ public class Game : MonoBehaviour
     public List<string> GetMoves()
     {
         return moves;
+    }
+
+    public int GetHalfmoveClock()
+    {
+        return halfmoveClock;
+    }
+
+    public int GetFullmoveNumber()
+    {
+        return fullmoveNumber;
     }
 
     public void SetEnPassantTarget(Pawn pawn)
@@ -533,5 +649,22 @@ public class Game : MonoBehaviour
     {
         return (currentPlayer == "white" && whiteIsAI) ||
            (currentPlayer == "black" && blackIsAI);
+    }
+
+    private void UpdateMoveCounters(Piece movedPiece, bool wasCapture)
+    {
+        if (movedPiece is Pawn || wasCapture)
+        {
+            halfmoveClock = 0;
+        }
+        else
+        {
+            halfmoveClock++;
+        }
+
+        if (currentPlayer == "black")
+        {
+            fullmoveNumber++;
+        }
     }
 }

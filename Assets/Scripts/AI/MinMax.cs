@@ -1,9 +1,14 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 
 public class MinMax : AI
 {
+
+    private const int MaterialWeight = 10;
+    private const int UnmovedPiecePenalty = 1;
+    private const int MobilityWeight = 1;
     // 32
     private int Utility(GameState game)
     {
@@ -12,55 +17,75 @@ public class MinMax : AI
         {
             if (piece.IsActive)
             {
-                score += piece.GetWorth();
+                score += piece.GetWorth() * MaterialWeight;
+                if (!piece.HasMoved && (!piece.IsKing || !piece.IsPawn)) score -= UnmovedPiecePenalty;
+                if (piece.IsInCheck) score -= 8;
             }
+
         }
+
         foreach (var piece in game.GetPieces("black"))
         {
             if (piece.IsActive)
             {
-                score -= piece.GetWorth(); 
+                score -= piece.GetWorth() * MaterialWeight;
+                if (!piece.HasMoved) score += UnmovedPiecePenalty;
+                if (piece.IsInCheck) score += 8;
             }
         }
-        
+
+        int whiteMobility = game.GetPossibleMoveCount("white");
+        int blackMobility = game.GetPossibleMoveCount("black");
+        score += (int)((whiteMobility - blackMobility) * 0.2f);
+
         return score;
     }
 
-    public bool isCutoff(int depth){
-        return depth > 1;
+    public bool isCutoff(int depth)
+    {
+        return depth > 3;
     }
-    
-    public EvalMove MaxValue(GameState game, int depth, int alpha, int beta){
-        List<Move> moves = game.GetPossibleMoves(); // find all legal moves.
-        if(isCutoff(depth) || moves.Count == 0){ // see if we should stop going further down.
-            return new EvalMove(Utility(game),null);
+
+    public EvalMove MaxValue(GameState game, int depth, int alpha, int beta)
+    {
+        List<Move> allmoves = game.GetPossibleMoves(); // find all legal moves.
+        List<Move> moves = game.SortAttack(allmoves);
+
+        if (isCutoff(depth) || moves.Count == 0)
+        { // see if we should stop going further down.
+            return new EvalMove(Utility(game), null);
         }
 
         int bestEval = int.MinValue; // placeholder bestEval
         Move bestMove = new Move(); // placeholder move
 
         // look through all moves, and see which returns the highest utility.
-        for(int i = 0; i < moves.Count; i++){ 
+        for (int i = 0; i < moves.Count; i++)
+        {
             var move = moves[i];
 
             GameState gameSim = game.ApplyMove(move);
 
             EvalMove ev = MinValue(gameSim, depth + 1, alpha, beta); // looks at best move for Min player
-            if (ev.value > bestEval){ // update best move if better utility
+            if (ev.value > bestEval)
+            { // update best move if better utility
                 bestEval = ev.value;
                 bestMove = move;
                 alpha = Mathf.Max(alpha, ev.value);
             }
-            if(alpha >= beta) return new EvalMove(bestEval, bestMove);  // makes beta cut
-            
+            if (alpha >= beta) return new EvalMove(bestEval, bestMove);  // makes beta cut
+
         }
         return new EvalMove(bestEval, bestMove);
     }
 
-    
-    public EvalMove MinValue(GameState game, int depth, int alpha, int beta){
-        List<Move> moves = game.GetPossibleMoves(); // find all legal moves.
-        if(isCutoff(depth) || moves.Count == 0){ // see if we should stop going further down.
+
+    public EvalMove MinValue(GameState game, int depth, int alpha, int beta)
+    {
+        List<Move> allmoves = game.GetPossibleMoves(); // find all legal moves.
+        List<Move> moves = game.SortAttack(allmoves);
+        if (isCutoff(depth) || moves.Count == 0)
+        { // see if we should stop going further down.
             return new EvalMove(Utility(game), null);
         }
 
@@ -68,18 +93,20 @@ public class MinMax : AI
         Move bestMove = new Move(); // placeholder move
 
         // look through all moves, and see which returns the highest utility.
-        for(int i = 0; i < moves.Count; i++){
+        for (int i = 0; i < moves.Count; i++)
+        {
             var move = moves[i];
             GameState gameSim = game.ApplyMove(move);
 
             EvalMove ev = MaxValue(gameSim, depth + 1, alpha, beta); // looks at best move for Min player
-            if (ev.value < bestEval){ // update best move if better utility
+            if (ev.value < bestEval)
+            { // update best move if better utility
                 bestEval = ev.value;
                 bestMove = move;
                 beta = Mathf.Min(beta, ev.value);
             }
             if (beta <= alpha) return new EvalMove(bestEval, bestMove); // makes alpha cut
-        
+
         }
         return new EvalMove(bestEval, bestMove);
     }
@@ -105,7 +132,7 @@ public class MinMax : AI
     /// </remarks>
     public override void MakeMove(Game game)
     {
-        
+
         GameState gameState = new GameState(game);
         EvalMove evmove = game.GetCurrentPlayer() == "white"
             ? MaxValue(gameState, 0, int.MinValue, int.MaxValue)

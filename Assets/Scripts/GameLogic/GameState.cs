@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
@@ -35,6 +34,8 @@ public class GameState
     private PieceState _whiteKing;
     private PieceState _blackKing;
     private bool _disableMoveCache;
+    private int? _whitePossibleMoveCount;
+    private int? _blackPossibleMoveCount;
 
     private sealed class MoveUndoState
     {
@@ -61,6 +62,7 @@ public class GameState
     public string CurrentPlayer { get; private set; }
     public bool GameOver { get; private set; }
     public Vector2Int? EnPassantTargetSquare { get; private set; }
+    public int amountMoves { get; private set; }
 
     private readonly Dictionary<PieceState, (List<Vector2Int> moves, List<Vector2Int> attacks)> moveCache
     = new();
@@ -175,6 +177,24 @@ public class GameState
         }
     }
 
+    public List<Move> SortAttack(List<Move> moves)
+    {
+        var sorted = new List<Move>(moves.Count);
+
+        foreach (var move in moves)
+        {
+            if (move.IsAttack) sorted.Add(move);
+        }
+
+        foreach (var move in moves)
+        {
+            if (!move.IsAttack) sorted.Add(move);
+        }
+
+        return sorted;
+    }
+
+
     /// <summary>
     /// Gets the piece on a board square, or null if the square is empty.
     /// </summary>
@@ -221,7 +241,32 @@ public class GameState
     /// </remarks>
     public List<Move> GetPossibleMoves(string player)
     {
-        return GetMoves(player, true);
+        var moves = GetMoves(player, true);
+
+        if (!_disableMoveCache)
+        {
+            CachePossibleMoveCount(player, moves.Count);
+        }
+
+        return moves;
+    }
+
+    public int GetPossibleMoveCount(string player)
+    {
+        if (_disableMoveCache)
+        {
+            return GetMoves(player, true).Count;
+        }
+
+        int? cachedCount = player == "white" ? _whitePossibleMoveCount : _blackPossibleMoveCount;
+        if (cachedCount.HasValue)
+        {
+            return cachedCount.Value;
+        }
+
+        int moveCount = GetMoves(player, true).Count;
+        CachePossibleMoveCount(player, moveCount);
+        return moveCount;
     }
 
     /// <summary>
@@ -233,7 +278,16 @@ public class GameState
     /// </remarks>
     public List<Move> GetPossibleMoves()
     {
-        return GetPossibleMoves(CurrentPlayer);
+        var moves = GetPossibleMoves(CurrentPlayer);
+        amountMoves = moves.Count;
+        return moves;
+    }
+
+    public int GetPossibleMoveCount()
+    {
+        int moveCount = GetPossibleMoveCount(CurrentPlayer);
+        amountMoves = moveCount;
+        return moveCount;
     }
 
     /// <summary>
@@ -309,19 +363,19 @@ public class GameState
         var legalMoveSquares = new List<Vector2Int>();
         var legalAttackSquares = new List<Vector2Int>();
 
-        foreach (var move in moveSquares)
-        {
-            if (IsMoveSafe(piece, move.x, move.y))
-            {
-                legalMoveSquares.Add(move);
-            }
-        }
-
         foreach (var attack in attackSquares)
         {
             if (IsMoveSafe(piece, attack.x, attack.y))
             {
                 legalAttackSquares.Add(attack);
+            }
+        }
+
+        foreach (var move in moveSquares)
+        {
+            if (IsMoveSafe(piece, move.x, move.y))
+            {
+                legalMoveSquares.Add(move);
             }
         }
 
@@ -551,6 +605,7 @@ public class GameState
     private void ApplyMoveInternal(Move move, bool isAttack)
     {
         moveCache.Clear();
+        InvalidatePossibleMoveCountCache();
 
         var movingPiece = GetPosition(move.GetFromMatrixX(), move.GetFromMatrixY());
         if (movingPiece == null)
@@ -824,18 +879,36 @@ public class GameState
                 ? GetAllLegalMoves(piece)
                 : GetPieceMoves(piece);
 
-            foreach (var move in pieceMoves)
-            {
-                possibleMoves.Add(new Move(piece.MatrixX, piece.MatrixY, move.x, move.y));
-            }
-
             foreach (var move in pieceAttacks)
             {
                 possibleMoves.Add(new Move(piece.MatrixX, piece.MatrixY, move.x, move.y, true));
             }
+
+            foreach (var move in pieceMoves)
+            {
+                possibleMoves.Add(new Move(piece.MatrixX, piece.MatrixY, move.x, move.y));
+            }
         }
 
         return possibleMoves;
+    }
+
+    private void CachePossibleMoveCount(string player, int moveCount)
+    {
+        if (player == "white")
+        {
+            _whitePossibleMoveCount = moveCount;
+            return;
+        }
+
+        _blackPossibleMoveCount = moveCount;
+    }
+
+    private void InvalidatePossibleMoveCountCache()
+    {
+        _whitePossibleMoveCount = null;
+        _blackPossibleMoveCount = null;
+        amountMoves = 0;
     }
 
     /// <summary>
