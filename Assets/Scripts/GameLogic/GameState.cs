@@ -65,6 +65,7 @@ public class GameState
     public Vector2Int? EnPassantTargetSquare { get; private set; }
     public int amountMoves { get; private set; }
 
+    private readonly Stack<MoveUndoState> _searchUndoStates = new();
     private readonly Dictionary<PieceState, (List<Vector2Int> moves, List<Vector2Int> attacks)> moveCache
     = new();
 
@@ -438,6 +439,36 @@ public class GameState
 
         nextState.ApplyMoveInternal(move, isAttack);
         return nextState;
+    }
+
+    public void ApplyMoveInPlace(Move move)
+    {
+        ApplyMoveInPlace(move, IsAttackMove(move));
+    }
+
+    public void ApplyMoveInPlace(Move move, bool isAttack)
+    {
+        var movingPiece = GetPosition(move.GetFromMatrixX(), move.GetFromMatrixY());
+        if (movingPiece == null)
+        {
+            throw new InvalidOperationException("No piece found on the move's starting square.");
+        }
+
+        moveCache.Clear();
+        InvalidatePossibleMoveCountCache();
+        _searchUndoStates.Push(ApplyTemporaryMove(movingPiece, move.GetMatrixX(), move.GetMatrixY(), isAttack, false));
+    }
+
+    public void UndoLastMove()
+    {
+        if (_searchUndoStates.Count == 0)
+        {
+            throw new InvalidOperationException("No move has been applied in place.");
+        }
+
+        UndoTemporaryMove(_searchUndoStates.Pop());
+        moveCache.Clear();
+        InvalidatePossibleMoveCountCache();
     }
 
     /// <summary>
@@ -927,7 +958,7 @@ public class GameState
     /// </remarks>
     private bool IsMoveSafe(PieceState piece, int x, int y, bool isAttack)
     {
-        var undoState = ApplyTemporaryMove(piece, x, y, isAttack);
+        var undoState = ApplyTemporaryMove(piece, x, y, isAttack, true);
         bool isSafe = !IsKingInCheck(piece.Player);
         UndoTemporaryMove(undoState);
         return isSafe;
@@ -1010,11 +1041,12 @@ public class GameState
     /// <param name="x">The temporary target x coordinate.</param>
     /// <param name="y">The temporary target y coordinate.</param>
     /// <param name="isAttack">Whether the move captures a piece.</param>
+    /// <param name="disableMoveCache">Whether cached move data should be disabled while the move is active.</param>
     /// <returns>The information needed to undo the move again.</returns>
     /// <remarks>
     /// Runtime: O(1). This only updates the touched pieces and board squares, without cloning the whole state.
     /// </remarks>
-    private MoveUndoState ApplyTemporaryMove(PieceState piece, int x, int y, bool isAttack)
+    private MoveUndoState ApplyTemporaryMove(PieceState piece, int x, int y, bool isAttack, bool disableMoveCache)
     {
         var movingPiece = GetPosition(piece.MatrixX, piece.MatrixY);
         if (movingPiece == null)
@@ -1056,7 +1088,7 @@ public class GameState
             PreviousDisableMoveCache = _disableMoveCache
         };
 
-        _disableMoveCache = true;
+        _disableMoveCache = disableMoveCache;
 
         _positions[undoState.MovingFromX, undoState.MovingFromY] = null;
         movingPiece.MatrixX = x;

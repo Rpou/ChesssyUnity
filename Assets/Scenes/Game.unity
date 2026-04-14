@@ -342,10 +342,13 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}
-  whiteIsAI: 0
+  whiteIsAI: 1
   blackIsAI: 1
-  blackAI: {fileID: 1149389160}
-  whiteAI: {fileID: 842277914}
+  fastSimulationMode: 1
+  aiMoveDelaySeconds: 0
+  maxAIMovesPerFrame: 1
+  blackAI: {fileID: 840267370}
+  whiteAI: {fileID: 1039235327}
 --- !u!1 &342368038
 GameObject:
   m_ObjectHideFlags: 0
@@ -836,6 +839,58 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 795292926}
   m_CullTransparentMesh: 1
+--- !u!1 &840267369
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 840267371}
+  - component: {fileID: 840267370}
+  m_Layer: 0
+  m_Name: BlackStockfishAI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &840267370
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 840267369}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6e29a5dfd3d87202a1503827aa6d5c4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StockfishAI
+  enginePath: /home/rasmus/Desktop/Code/HomeProjects/chessBots/MinMax3Basic/engines/stockfish/stockfish
+  engineArguments: 
+  threads: 1
+  hashMb: 16
+  skillLevel: 0
+  searchDepth: 0
+  searchNodes: 200
+  moveTimeMs: 10
+--- !u!4 &840267371
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 840267369}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1.69476, y: -0.14629, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &842277913
 GameObject:
   m_ObjectHideFlags: 0
@@ -1006,6 +1061,50 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 986130116}
   m_CullTransparentMesh: 1
+--- !u!1 &1039235326
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1039235328}
+  - component: {fileID: 1039235327}
+  m_Layer: 0
+  m_Name: WhiteMinMaxAI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1039235327
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1039235326}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9fc2bfc3db6d35478b790f0224b44a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MinMax
+--- !u!4 &1039235328
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1039235326}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1.69476, y: -0.14629, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1149389159
 GameObject:
   m_ObjectHideFlags: 0
@@ -1816,3 +1915,5 @@ SceneRoots:
   - {fileID: 1240969627}
   - {fileID: 1149389161}
   - {fileID: 842277915}
+  - {fileID: 840267371}
+  - {fileID: 1039235328}

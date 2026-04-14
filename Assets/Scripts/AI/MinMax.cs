@@ -10,11 +10,10 @@ public class MinMax : AI
     private const int MaterialWeight = 10;
     private const int UnmovedPiecePenalty = 1;
     private const int MobilityWeight = 1;
-    private int i = 0;
+    private int evaluatedMoves = 0;
     // 32
     private int Utility(GameState game)
     {
-        i += 1;
         int score = 0;
         foreach (var piece in game.GetPieces("white"))
         {
@@ -64,11 +63,11 @@ public class MinMax : AI
         // look through all moves, and see which returns the highest utility.
         for (int i = 0; i < moves.Count; i++)
         {
+            evaluatedMoves += 1;
             var move = moves[i];
-
-            GameState gameSim = game.ApplyMove(move);
-
-            EvalMove ev = MinValue(gameSim, depth + 1, alpha, beta); // looks at best move for Min player
+            game.ApplyMoveInPlace(move, move.GetIsAttack());
+            EvalMove ev = MinValue(game, depth + 1, alpha, beta); // looks at best move for Min player
+            game.UndoLastMove();
             if (ev.value > bestEval)
             { // update best move if better utility
                 bestEval = ev.value;
@@ -97,9 +96,9 @@ public class MinMax : AI
         for (int i = 0; i < moves.Count; i++)
         {
             var move = moves[i];
-            GameState gameSim = game.ApplyMove(move);
-
-            EvalMove ev = MaxValue(gameSim, depth + 1, alpha, beta); // looks at best move for Min player
+            game.ApplyMoveInPlace(move, move.GetIsAttack());
+            EvalMove ev = MaxValue(game, depth + 1, alpha, beta); // looks at best move for Min player
+            game.UndoLastMove();
             if (ev.value < bestEval)
             { // update best move if better utility
                 bestEval = ev.value;
@@ -133,7 +132,7 @@ public class MinMax : AI
     /// </remarks>
     public override void MakeMove(Game game)
     {
-        i = 0;
+        evaluatedMoves = 0;
         GameState gameState = new GameState(game);
         var searchTimer = System.Diagnostics.Stopwatch.StartNew();
         EvalMove evmove = game.GetCurrentPlayer() == "white"
@@ -144,7 +143,7 @@ public class MinMax : AI
         if (!evmove.move.HasValue) return;
 
         Move move = evmove.move.Value;
-        Debug.Log($"MinMax search took {searchTimer.Elapsed.TotalMilliseconds:F2} ms and ran {i} Utility evaluations.");
+        Debug.Log($"MinMax search took {searchTimer.Elapsed.TotalMilliseconds:F2} ms and looked at {evaluatedMoves} moves.");
         GameObject pieceObj = game.GetPosition(move.GetFromMatrixX(), move.GetFromMatrixY());
         game.MakeNextMove(pieceObj, move.GetMatrixX(), move.GetMatrixY(), move.GetIsAttack());
     }
