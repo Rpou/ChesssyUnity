@@ -5,7 +5,7 @@ public class Queen : Piece
 {
     private List<Vector2Int> _moveSquares = new List<Vector2Int>();
     private List<Vector2Int> _attackSquares = new List<Vector2Int>();
-    
+    private int worth = 9;
     public override King CanSeeKing()
     {
         (List<Vector2Int> moveSquares, List<Vector2Int> attackSquares) = MovementPatterns.GetPieceMoves(this, game);
@@ -24,6 +24,10 @@ public class Queen : Piece
     public override List<Vector2Int> GetAttackSquares()
     {
         return _attackSquares;
+    }
+    public override int GetWorth()
+    {
+        return worth;
     }
     
 }

@@ -67,5 +67,5 @@
         "*.sln": "*.csproj",
         "*.slnx": "*.csproj"
     },
-    "dotnet.defaultSolution": "ChesssyUnity.sln"
+    "dotnet.defaultSolution": "ChesssyUnity.slnx"
 }

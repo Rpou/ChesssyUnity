@@ -6,6 +6,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
 using GameLogic;
+using System.Linq;
 
 
 public class Game : MonoBehaviour
@@ -13,6 +14,7 @@ public class Game : MonoBehaviour
     private GameObject chessPiece;
     private GameObject movePlate;
     private SpriteManager spriteManager;
+    public GameObject evaluationBar;
 
     private GameObject[,] positions = new GameObject[8, 8];
     public GameObject[] playerBlack = new GameObject[16];
@@ -20,12 +22,29 @@ public class Game : MonoBehaviour
     private Pawn _enPassantTarget;
 
     private List<string> moves;
-    private string currentPlayer = "white";
+    private bool CurrentPlayerIsWhite = true;
     private bool gameOver = false;
+    private int halfmoveClock;
+    private int fullmoveNumber = 1;
+
+    public bool whiteIsAI = true;
+    public bool blackIsAI = true;
+    [SerializeField] private bool fastSimulationMode = true;
+    [SerializeField, Min(0f)] private float aiMoveDelaySeconds = 0f;
+    [SerializeField, Min(1)] private int maxAIMovesPerFrame = 1;
+
+    public AI blackAI;
+    public AI whiteAI;
+    private bool aiIsMakingMove = false;
+    private GameLogScript gameLogScript;
+    private TextMeshProUGUI winnerText;
+    private TextMeshProUGUI restartText;
 
     void Start()
     {
         moves = new List<string>();
+        halfmoveClock = 0;
+        fullmoveNumber = 1;
         movePlate = Resources.Load<GameObject>("Objects/MovePlate");
         chessPiece = Resources.Load<GameObject>("Objects/ChessPiece");
         // Load the SpriteManager from Resources
@@ -60,6 +79,8 @@ public class Game : MonoBehaviour
             CreatePiece<Pawn>("black_pawn", 4, 6), CreatePiece<Pawn>("black_pawn", 5, 6),
             CreatePiece<Pawn>("black_pawn", 6, 6), CreatePiece<Pawn>("black_pawn", 7, 6)
         };
+        CacheSceneReferences();
+        TryMakeAIMove();
     }
 
     void Update()
@@ -73,7 +94,10 @@ public class Game : MonoBehaviour
 
     public void NextTurn()
     {
-        currentPlayer = (currentPlayer == "white") ? "black" : "white";
+        
+        evaluationBar.GetComponent<EvaluationBar>().SetEvaluation(this);
+        CurrentPlayerIsWhite = !CurrentPlayerIsWhite;
+        TryMakeAIMove();
     }
 
     // Generic method to create a chess piece of a specific type
@@ -126,12 +150,101 @@ public class Game : MonoBehaviour
         }
     }
 
-    // worst case: 16 + 16 + 16 = 48
-    public King CheckIfKingInCheck(string opponent, bool isSimulation = false)
+    private void TryMakeAIMove()
+    {
+        if (!gameOver && IsCurrentPlayerAI() && !aiIsMakingMove)
+        {
+            StartCoroutine(MakeAIMoveCoroutine());
+        }
+    }
+
+    private IEnumerator MakeAIMoveCoroutine()
+    {
+        aiIsMakingMove = true;
+        var moveFailed = false;
+        var movesThisFrame = 0;
+
+        while (!gameOver && IsCurrentPlayerAI())
+        {
+            if (aiMoveDelaySeconds > 0f)
+            {
+                yield return new WaitForSeconds(aiMoveDelaySeconds);
+            }
+
+            if (gameOver || !IsCurrentPlayerAI())
+            {
+                break;
+            }
+
+            AI currentAIController = CurrentPlayerIsWhite ? whiteAI : blackAI;
+            if (currentAIController == null)
+            {
+                Debug.LogError($"No AI assigned for {CurrentPlayerIsWhite}.");
+                break;
+            }
+
+            bool movingPlayer = CurrentPlayerIsWhite;
+            currentAIController.MakeMove(this);
+
+            if (!gameOver && CurrentPlayerIsWhite == movingPlayer)
+            {
+                Debug.LogWarning($"{currentAIController.GetType().Name} did not complete a move for {movingPlayer}.");
+                moveFailed = true;
+                break;
+            }
+
+            if (!ShouldContinueAIMoveLoop())
+            {
+                break;
+            }
+
+            movesThisFrame++;
+            if (movesThisFrame >= Mathf.Max(1, maxAIMovesPerFrame))
+            {
+                movesThisFrame = 0;
+                yield return null;
+            }
+        }
+
+        aiIsMakingMove = false;
+        if (!moveFailed)
+        {
+            TryMakeAIMove();
+        }
+    }
+
+    private bool ShouldContinueAIMoveLoop()
+    {
+        return aiMoveDelaySeconds <= 0f && IsFastSimulationActive();
+    }
+
+    private void CacheSceneReferences()
+    {
+        GameObject sidePanelController = GameObject.Find("SidePanelController");
+        if (sidePanelController != null)
+        {
+            gameLogScript = sidePanelController.GetComponent<GameLogScript>();
+        }
+
+        GameObject winnerObject = GameObject.FindGameObjectWithTag("WinnerTag");
+        if (winnerObject != null)
+        {
+            winnerText = winnerObject.GetComponent<TextMeshProUGUI>();
+        }
+
+        GameObject restartObject = GameObject.FindGameObjectWithTag("RestartTag");
+        if (restartObject != null)
+        {
+            restartText = restartObject.GetComponent<TextMeshProUGUI>();
+        }
+    }
+
+    // worst case: 16 + 16*27(432) + 16 = 464
+    public King CheckIfKingInCheck(bool currentPlayerIsWhite, bool isSimulation = false)
     {
         List<GameObject> allPieces = new List<GameObject>();
 
-        allPieces.AddRange(opponent == "black" ? playerWhite : playerBlack);
+        allPieces.AddRange(currentPlayerIsWhite ? playerBlack : playerWhite);
 
         // Check if any opponent piece can attack the king
         foreach (var gameObjectPiece in allPieces)
@@ -144,15 +257,15 @@ public class Game : MonoBehaviour
             if (kingInCheck == null) continue;
             if (!isSimulation)
             {
-                kingInCheck.SetInCheck(true); 
-                Debug.Log($"{opponent} King is in Check by {piece.name}");
+                kingInCheck.SetInCheck(true);
+                Debug.Log($"{currentPlayerIsWhite} King is in Check by {piece.name}");
             }
             return kingInCheck;
         }
 
         if (isSimulation) return null;
 
-        var playerPieces = opponent == "black" ? playerBlack : playerWhite;
+        var playerPieces = currentPlayerIsWhite ? playerWhite: playerBlack;
         foreach (var gameObject in playerPieces)
         {
             if (gameObject == null || !gameObject.activeSelf) continue; // Skip if the piece is destroyed
@@ -165,16 +278,16 @@ public class Game : MonoBehaviour
         return null;
     }
 
-    public bool AnyLegalMoves(string opponent)
+    public bool AnyLegalMoves(bool currentPlayerIsWhite)
     {
         List<GameObject> allPieces = new List<GameObject>();
 
-        allPieces.AddRange(opponent == "black" ? playerBlack : playerWhite);
+        allPieces.AddRange(currentPlayerIsWhite ? playerWhite : playerBlack);
 
         // Check if any opponent piece can move
         foreach (var gameObject in allPieces)
         {
-            if(gameObject == null || !gameObject.activeSelf) continue;
+            if (gameObject == null || !gameObject.activeSelf) continue;
             Piece piece = gameObject.GetComponent<Piece>();
             (List<Vector2Int> pieceMoves, List<Vector2Int> pieceAttacks) = piece.GetAllLegalMoves();
             if (pieceMoves.Count != 0 || pieceAttacks.Count != 0) return true;
@@ -183,20 +296,29 @@ public class Game : MonoBehaviour
         return false;
     }
 
+    public GameState GetGameState()
+    {
+        return new GameState(this);
+    }
+
+    public GameState CreateNextState(Move move)
+    {
+        return GetGameState().ApplyMove(move, IsAttackMove(move));
+    }
+
     public void Winner(string playerWinner)
     {
         gameOver = true;
-        if (playerWinner == null)
+        if (winnerText != null)
         {
-            GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<TextMeshProUGUI>().enabled = true;
-            GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<TextMeshProUGUI>().text = "it is a draw!";
+            winnerText.enabled = true;
+            winnerText.text = playerWinner == null ? "it is a draw!" : playerWinner + " is the winner";
         }
-        else
+
+        if (restartText != null)
         {
-            GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<TextMeshProUGUI>().enabled = true;
-            GameObject.FindGameObjectWithTag("WinnerTag").GetComponent<TextMeshProUGUI>().text = playerWinner + " is the winner";
+            restartText.enabled = true;
         }
-        GameObject.FindGameObjectWithTag("RestartTag").GetComponent<TextMeshProUGUI>().enabled = true;
     }
 
     /// <summary>
@@ -243,46 +365,21 @@ public class Game : MonoBehaviour
         mpScript.SetCoords(matrixX, matrixY);
     }
 
+    // see king: 646*2(checkKingCheck) +202 + 432(anylegalmoves) + 16. Total: 1942
     public void MakeNextMove(GameObject reference, int matrixX, int matrixY, bool attack)
     {
-        GameObject cp = GetPosition(matrixX, matrixY);
         Piece piece = reference.GetComponent<Piece>();
         var beforeMoveX = reference.GetComponent<Piece>().GetxBoard();
         var beforeMoveY = reference.GetComponent<Piece>().GetyBoard();
-        
+        var isFastSimulation = IsFastSimulationActive();
+
         if (attack)
         {
-            var isEnPassantCapture = false;
-            if (piece is Pawn)
-            {
-                int plusMinusOne = piece.GetPlayer().Equals("white") ? -1 : 1;
-                int enPassantY = matrixY + plusMinusOne;
-
-                if (PositionOnBoard(matrixX, enPassantY))
-                {
-                    var targetPosition = GetPosition(matrixX, enPassantY);
-                    var possiblePiece = targetPosition != null ? targetPosition.GetComponent<Piece>() : null;
-                    if (possiblePiece != null && possiblePiece == GetEnPassentTarget())
-                    {
-                        isEnPassantCapture = true;
-                        SetPositionEmpty(matrixX, enPassantY);
-                        targetPosition.SetActive(false);
-                        Debug.Log("Destroying: " + possiblePiece.name);
-                        Destroy(targetPosition);
-                    }
-                }
-            }
-
-            if (!isEnPassantCapture && cp != null)
-            {
-                cp.SetActive(false);
-                Debug.Log("Destroying: " + cp.name);
-                Destroy(cp);
-            }
+            HandleAttack(piece, matrixX, matrixY);
         }
 
         SetPositionEmpty(beforeMoveX, beforeMoveY);
-        
+
         piece.SetXBoard(matrixX);
         piece.SetYBoard(matrixY);
         piece.SetCoords();
@@ -307,8 +404,11 @@ public class Game : MonoBehaviour
             {
                 rook = (Rook)GetPosition(beforeMoveX - 4, beforeMoveY).GetComponent<Piece>();
             }
-            MovementPatterns.MoveRookAfterCastlingMove(movedKing, rook, this);
-            movedKing.ChangeHasMoved(true);
+            if (rook != null && rook.GetPlayer() == movedKing.GetPlayer())
+            {
+                MovementPatterns.MoveRookAfterCastlingMove(movedKing, rook, this);
+                movedKing.ChangeHasMoved(true);
+            }
         }
         if (piece is Rook movedRook) movedRook.SetHasMoved(true);
         if (piece is Pawn pawn && Math.Abs(beforeMoveY - matrixY) == 2)
@@ -319,20 +419,36 @@ public class Game : MonoBehaviour
         {
             SetEnPassantTarget(null);
         }
-        CheckIfKingInCheck(GetCurrentPlayer());
-        
-        // Check if **opponent’s** king is in check before switching turns
-        string opponent = GetCurrentPlayer() == "white" ? "black" : "white";
-        King king = CheckIfKingInCheck(opponent); // 48
-        var putInCheck = king != null;
-        var move = NotationCreater.CreateNotation(piece, beforeMoveX, beforeMoveY, 
-            matrixX, matrixY, putInCheck, attack, castled, this); // 202
-        AddMove(move);
-        GameObject.Find("SidePanelController").GetComponent<GameLogScript>().LogMove(this);
+        UpdateMoveCounters(piece, attack);
 
-        if (!AnyLegalMoves(opponent))
+        bool putInCheck;
+        bool opponentHasLegalMoves;
+
+        if (isFastSimulation)
         {
-            if (putInCheck) Winner(GetCurrentPlayer());
+            var updatedState = GetGameState();
+            putInCheck = updatedState.IsKingInCheck(!CurrentPlayerIsWhite);
+            opponentHasLegalMoves = updatedState.AnyLegalMoves(!CurrentPlayerIsWhite);
+        }
+        else
+        {
+            CheckIfKingInCheck(CurrentPlayerIsWhite);
+            King king = CheckIfKingInCheck(!CurrentPlayerIsWhite); // 464
+            putInCheck = king != null;
+            string move = NotationCreater.CreateNotation(piece, beforeMoveX, beforeMoveY,
+                matrixX, matrixY, putInCheck, attack, castled, this); // 202
+            AddMove(move);
+            if (gameLogScript != null)
+            {
+                gameLogScript.LogMove(this);
+            }
+
+            opponentHasLegalMoves = AnyLegalMoves(!CurrentPlayerIsWhite);
+        }
+
+        if (!opponentHasLegalMoves)
+        {
+            if (putInCheck) Winner(CurrentPlayerIsWhite ? "White" : "Black");
             else Winner(null);
         }
 
@@ -340,16 +456,127 @@ public class Game : MonoBehaviour
         {
             Destroy(reference);
         }
-        
+
         NextTurn();
-        DestroyMovePlates(); // 16
+        if (!isFastSimulation)
+        {
+            DestroyMovePlates(); // 16
+        }
+    }
+
+    /// <summary>
+    /// Handles taking an opponent piece.
+    /// </summary>
+    /// <param name="piece"></param>
+    /// <param name="matrixX"></param>
+    /// <param name="matrixY"></param>
+    private void HandleAttack(Piece piece, int matrixX, int matrixY)
+    {
+        GameObject cp = GetPosition(matrixX, matrixY);
+        var isEnPassantCapture = false;
+        if (piece is Pawn)
+        {
+            int plusMinusOne = piece.GetPlayer() ? -1 : 1;
+            int enPassantY = matrixY + plusMinusOne;
+
+            if (PositionOnBoard(matrixX, enPassantY))
+            {
+                var targetPosition = GetPosition(matrixX, enPassantY);
+                var possiblePiece = targetPosition != null ? targetPosition.GetComponent<Piece>() : null;
+                if (possiblePiece != null && possiblePiece == GetEnPassentTarget())
+                {
+                    isEnPassantCapture = true;
+                    SetPositionEmpty(matrixX, enPassantY);
+                    targetPosition.SetActive(false);
+                    if (!IsFastSimulationActive())
+                    {
+                        Debug.Log("Destroying: " + possiblePiece.name);
+                    }
+                    Destroy(targetPosition);
+                }
+            }
+        }
+
+        if (!isEnPassantCapture && cp != null)
+        {
+            cp.SetActive(false);
+            if (!IsFastSimulationActive())
+            {
+                Debug.Log("Destroying: " + cp.name);
+            }
+            Destroy(cp);
+        }
+
+    }
+
+    public List<Move> GetPossibleMoves(bool currentPlayerIsWhite)
+    {
+        List<GameObject> allPieces = new List<GameObject>();
+        List<Move> possibleMoves = new List<Move>();
+
+        allPieces.AddRange(currentPlayerIsWhite ? playerWhite: playerBlack);
+
+        // Check if any opponent piece can move
+        foreach (var gameObject in allPieces)
+        {
+            if (gameObject == null || !gameObject.activeSelf) continue;
+            Piece piece = gameObject.GetComponent<Piece>();
+            (List<Vector2Int> pieceMoves, List<Vector2Int> pieceAttacks) = piece.GetAllLegalMoves();
+
+            foreach (var move in pieceMoves)
+            {
+                possibleMoves.Add(new Move(piece, move));
+            }
+
+            foreach (var move in pieceAttacks)
+            {
+                possibleMoves.Add(new Move(piece, move, true));
+            }
+        }
+
+        return possibleMoves;
+    }
+
+    public List<Move> GetPossibleMoves()
+    {
+        return GetPossibleMoves(CurrentPlayerIsWhite);
+    }
+
+    public bool IsAttackMove(Move move)
+    {
+        if (GetPosition(move.GetMatrixX(), move.GetMatrixY()) != null)
+        {
+            return true;
+        }
+
+        Piece piece = move.GetPiece();
+        if (piece == null)
+        {
+            var gameObject = GetPosition(move.GetFromMatrixX(), move.GetFromMatrixY());
+            piece = gameObject != null ? gameObject.GetComponent<Piece>() : null;
+        }
+
+        if (piece is not Pawn pawn)
+        {
+            return false;
+        }
+
+        if (move.GetMatrixX() == move.GetFromMatrixX())
+        {
+            return false;
+        }
+
+        var enPassantTarget = GetEnPassentTarget();
+        return enPassantTarget != null &&
+               enPassantTarget.GetxBoard() == move.GetMatrixX() &&
+               enPassantTarget.GetyBoard() == pawn.GetyBoard();
     }
 
     public bool PositionOnBoard(int x, int y)
     {
         return x >= 0 && y >= 0 && x < positions.GetLength(0) && y < positions.GetLength(1);
     }
-    
+
     // worst case: 16
     public void DestroyMovePlates()
     {
@@ -359,7 +586,7 @@ public class Game : MonoBehaviour
             Destroy(movePlates[i]);
         }
     }
-    
+
     public void SetPosition(GameObject obj)
     {
         Piece piece = obj.GetComponent<Piece>();
@@ -378,14 +605,19 @@ public class Game : MonoBehaviour
     }
 
 
-    public string GetCurrentPlayer()
+    public bool GetCurrentPlayer()
     {
-        return currentPlayer;
+        return CurrentPlayerIsWhite;
     }
 
     public bool IsGameOver()
     {
         return gameOver;
+    }
+
+    public bool IsFastSimulationActive()
+    {
+        return fastSimulationMode && whiteIsAI && blackIsAI;
     }
 
     public void AddMove(string move)
@@ -398,6 +630,16 @@ public class Game : MonoBehaviour
         return moves;
     }
 
+    public int GetHalfmoveClock()
+    {
+        return halfmoveClock;
+    }
+
+    public int GetFullmoveNumber()
+    {
+        return fullmoveNumber;
+    }
+
     public void SetEnPassantTarget(Pawn pawn)
     {
         _enPassantTarget = pawn;
@@ -406,5 +648,28 @@ public class Game : MonoBehaviour
     public Pawn GetEnPassentTarget()
     {
         return _enPassantTarget;
+    }
+
+    public bool IsCurrentPlayerAI()
+    {
+        return (CurrentPlayerIsWhite && whiteIsAI) ||
+           (!CurrentPlayerIsWhite && blackIsAI);
+    }
+
+    private void UpdateMoveCounters(Piece movedPiece, bool wasCapture)
+    {
+        if (movedPiece is Pawn || wasCapture)
+        {
+            halfmoveClock = 0;
+        }
+        else
+        {
+            halfmoveClock++;
+        }
+
+        if (!CurrentPlayerIsWhite)
+        {
+            fullmoveNumber++;
+        }
     }
 }

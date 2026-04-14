@@ -6,7 +6,7 @@ public class Rook : Piece
     private List<Vector2Int> _moveSquares = new List<Vector2Int>();
     private List<Vector2Int> _attackSquares = new List<Vector2Int>();
     private bool _hasMoved = false;
-    
+    private int worth = 5;
     public override King CanSeeKing()
     {
         (List<Vector2Int> moveSquares, List<Vector2Int> attackSquares) = MovementPatterns.GetPieceMoves(this, game);
@@ -35,5 +35,10 @@ public class Rook : Piece
     public bool HasMoved()
     {
         return _hasMoved;
+    }
+
+    public override int GetWorth()
+    {
+        return worth;
     }
 }
