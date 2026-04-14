@@ -1090,12 +1090,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b6e29a5dfd3d87202a1503827aa6d5c4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::StockfishAI
-  enginePath: Assets/engines/stockfish/stockfish-windows.exe
+  enginePath: C:\Users\Rasmus\Desktop\engines\stockfish\stockfish-windows
   engineArguments: 
   threads: 1
   hashMb: 16
   skillLevel: 0
-  limitStrength: 0
+  limitStrength: 1
   elo: 1320
   searchDepth: 0
   searchNodes: 200
@@ -1964,13 +1964,13 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 10
-  m_fontSizeBase: 10
+  m_fontSize: 12
+  m_fontSizeBase: 12
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
   m_fontSizeMax: 72
-  m_fontStyle: 0
+  m_fontStyle: 1
   m_HorizontalAlignment: 1
   m_VerticalAlignment: 256
   m_textAlignment: 65535

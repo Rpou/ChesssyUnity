@@ -24,126 +24,122 @@ namespace GameLogic
                 return result;
             }
 
+            game.SetPositionEmpty(xPositionAfter, yPositionAfter);
             piece.SetXBoard(xPositionBefore);
             piece.SetYBoard(yPositionBefore);
             piece.SetCoords();
             game.SetPosition(piece.gameObject);
 
-            var overlap = LegalMovesOverlapSameTypePiece(piece, game);
-
-            if (piece is Knight)
+            try
             {
-                if (overlap) result = "N" + letterOfSquareBeforeMove + (yPositionBefore + 1) + result + letterOfSquareMovedTo + (yPositionAfter + 1);
-                else result = "N" + result + letterOfSquareMovedTo + (yPositionAfter + 1);
-            }
+                var overlap = LegalMovesOverlapSameTypePiece(piece, xPositionAfter, yPositionAfter, game);
 
-            if (piece is Bishop)
-            {
-                result = "B" + result + letterOfSquareMovedTo + (yPositionAfter + 1);
-            }
-
-            if (piece is Rook)
-            {
-                if (overlap) result = "R" + letterOfSquareBeforeMove + (yPositionBefore + 1) + result + letterOfSquareMovedTo + (yPositionAfter + 1);
-                else result = "R" + result + letterOfSquareMovedTo + (yPositionAfter + 1);
-            }
-
-            if (piece is Queen)
-            {
-                if (overlap) result = "Q" + letterOfSquareBeforeMove + (yPositionBefore + 1) + result + letterOfSquareMovedTo + (yPositionAfter + 1);
-                else result = "Q" + result + letterOfSquareMovedTo + (yPositionAfter + 1);
-            }
-
-            if (piece is King)
-            {
-                var isRightRook = xPositionAfter > xPositionBefore;
-                if (castled)
+                if (piece is Knight)
                 {
-                    if (isRightRook) result = "O-O";
-                    else result = "O-O-O";
+                    if (overlap) result = "N" + letterOfSquareBeforeMove + (yPositionBefore + 1) + result + letterOfSquareMovedTo + (yPositionAfter + 1);
+                    else result = "N" + result + letterOfSquareMovedTo + (yPositionAfter + 1);
                 }
-                else result = "K" + result + letterOfSquareMovedTo + (yPositionAfter + 1);
+
+                if (piece is Bishop)
+                {
+                    result = "B" + result + letterOfSquareMovedTo + (yPositionAfter + 1);
+                }
+
+                if (piece is Rook)
+                {
+                    if (overlap) result = "R" + letterOfSquareBeforeMove + (yPositionBefore + 1) + result + letterOfSquareMovedTo + (yPositionAfter + 1);
+                    else result = "R" + result + letterOfSquareMovedTo + (yPositionAfter + 1);
+                }
+
+                if (piece is Queen)
+                {
+                    if (overlap) result = "Q" + letterOfSquareBeforeMove + (yPositionBefore + 1) + result + letterOfSquareMovedTo + (yPositionAfter + 1);
+                    else result = "Q" + result + letterOfSquareMovedTo + (yPositionAfter + 1);
+                }
+
+                if (piece is King)
+                {
+                    var isRightRook = xPositionAfter > xPositionBefore;
+                    if (castled)
+                    {
+                        if (isRightRook) result = "O-O";
+                        else result = "O-O-O";
+                    }
+                    else result = "K" + result + letterOfSquareMovedTo + (yPositionAfter + 1);
+                }
+
+                if (putInCheck) result += "+";
+                return result;
             }
-
-            if (putInCheck) result += "+";
-
-            game.SetPositionEmpty(xPositionBefore, yPositionBefore); // Remove our piece from the new location
-            piece.SetXBoard(xPositionAfter);
-            piece.SetYBoard(yPositionAfter);
-            piece.SetCoords();
-            game.SetPosition(piece.gameObject);
-
-            return result;
+            finally
+            {
+                game.SetPositionEmpty(xPositionBefore, yPositionBefore);
+                piece.SetXBoard(xPositionAfter);
+                piece.SetYBoard(yPositionAfter);
+                piece.SetCoords();
+                game.SetPosition(piece.gameObject);
+            }
         }
 
         // worst case: 16 + (180) = 196
-        private static bool LegalMovesOverlapSameTypePiece(Piece pieceType, Game game)
+        private static bool LegalMovesOverlapSameTypePiece(Piece pieceType, int targetX, int targetY, Game game)
         {
             var player = game.GetCurrentPlayer();
-            List<GameObject> allPieces = new List<GameObject>();
-            allPieces.AddRange(player ? game.playerWhite : game.playerBlack);
+            var allPieces = player ? game.playerWhite : game.playerBlack;
 
             if (pieceType is Knight)
             {
-                return LegalMovesOverlap<Knight>(allPieces);
+                return LegalMovesOverlap<Knight>(allPieces, pieceType.gameObject, targetX, targetY);
             }
 
             if (pieceType is Rook)
             {
-                return LegalMovesOverlap<Rook>(allPieces);
+                return LegalMovesOverlap<Rook>(allPieces, pieceType.gameObject, targetX, targetY);
             }
 
             if (pieceType is Queen)
             {
-                return LegalMovesOverlap<Queen>(allPieces);
+                return LegalMovesOverlap<Queen>(allPieces, pieceType.gameObject, targetX, targetY);
             }
 
             return false;
         }
 
-        // worst case: 16 + 10 * 10 + 8 * 8 = 180
-        private static bool LegalMovesOverlap<T>(List<GameObject> allPieces) where T : Piece
+        // worst case: 16 * 27 = 432
+        private static bool LegalMovesOverlap<T>(IEnumerable<GameObject> allPieces, GameObject movedPieceObject, int targetX, int targetY) where T : Piece
         {
-            Piece piece1 = null;
-            Piece piece2 = null;
             foreach (var gameObject in allPieces)
             {
-                if (gameObject == null) continue;
-                Piece piece = gameObject.GetComponent<Piece>();
-                if (piece is T matchedPiece && piece1 == null)
+                if (gameObject == null || !gameObject.activeSelf || gameObject == movedPieceObject)
                 {
-                    piece1 = matchedPiece;
-                }
-                else if (piece is T matchedPiece2)
-                {
-                    piece2 = matchedPiece2;
+                    continue;
                 }
 
-                if (piece1 != null && piece2 != null)
+                if (gameObject.GetComponent<Piece>() is not T matchedPiece)
                 {
-                    (List<Vector2Int> moves1, List<Vector2Int> attacks1)
-                        = piece1.GetAllLegalMoves();
-                    (List<Vector2Int> moves2, List<Vector2Int> attacks2)
-                        = piece2.GetAllLegalMoves();
+                    continue;
+                }
 
-                    foreach (var move1 in moves1)
-                    {
-                        foreach (var move2 in moves2)
-                        {
-                            if (move1 == move2) return true;
-                        }
-                    }
-
-                    foreach (var attack1 in attacks1)
-                    {
-                        foreach (var attack2 in attacks2)
-                        {
-                            if (attack1 == attack2) return true;
-                        }
-                    }
-                    return false;
+                (List<Vector2Int> moves, List<Vector2Int> attacks) = matchedPiece.GetAllLegalMoves();
+                if (ContainsSquare(moves, targetX, targetY) || ContainsSquare(attacks, targetX, targetY))
+                {
+                    return true;
                 }
             }
+
+            return false;
+        }
+
+        private static bool ContainsSquare(IEnumerable<Vector2Int> squares, int x, int y)
+        {
+            foreach (var square in squares)
+            {
+                if (square.x == x && square.y == y)
+                {
+                    return true;
+                }
+            }
+
             return false;
         }
 

@@ -30,12 +30,14 @@ public class Game : MonoBehaviour
     public bool whiteIsAI = true;
     public bool blackIsAI = true;
     [SerializeField] private bool fastSimulationMode = true;
+    [SerializeField, Min(0f)] private float initialAIMoveDelaySeconds = 1f;
     [SerializeField, Min(0f)] private float aiMoveDelaySeconds = 0f;
     [SerializeField, Min(1)] private int maxAIMovesPerFrame = 1;
 
     public AI blackAI;
     public AI whiteAI;
     private bool aiIsMakingMove = false;
+    private bool initialAIMoveDelayApplied = false;
     private GameLogScript gameLogScript;
     private TextMeshProUGUI winnerText;
     private TextMeshProUGUI restartText;
@@ -124,6 +126,7 @@ public class Game : MonoBehaviour
         if (matrixY == 0 && piece.name == "black_pawn")
         {
             var promotedQueen = CreatePiece<Queen>("black_queen", matrixX, matrixY);
+            promotedQueen.GetComponent<Piece>().SetHasMovedState(true);
             ReplacePieceInPlayerArray(playerBlack, cp, promotedQueen);
             cp.SetActive(false);
             return promotedQueen;
@@ -132,6 +135,7 @@ public class Game : MonoBehaviour
         if (matrixY == 7 && piece.name == "white_pawn")
         {
             var promotedQueen = CreatePiece<Queen>("white_queen", matrixX, matrixY);
+            promotedQueen.GetComponent<Piece>().SetHasMovedState(true);
             ReplacePieceInPlayerArray(playerWhite, cp, promotedQueen);
             cp.SetActive(false);
             return promotedQueen;
@@ -163,6 +167,15 @@ public class Game : MonoBehaviour
         aiIsMakingMove = true;
         var moveFailed = false;
         var movesThisFrame = 0;
+
+        if (!initialAIMoveDelayApplied)
+        {
+            initialAIMoveDelayApplied = true;
+            if (initialAIMoveDelaySeconds > 0f)
+            {
+                yield return new WaitForSeconds(initialAIMoveDelaySeconds);
+            }
+        }
 
         while (!gameOver && IsCurrentPlayerAI())
         {
@@ -368,9 +381,21 @@ public class Game : MonoBehaviour
     // see king: 646*2(checkKingCheck) +202 + 432(anylegalmoves) + 16. Total: 1942
     public void MakeNextMove(GameObject reference, int matrixX, int matrixY, bool attack)
     {
+        if (reference == null)
+        {
+            Debug.LogError($"MakeNextMove received a null piece reference for target square ({matrixX}, {matrixY}).");
+            return;
+        }
+
         Piece piece = reference.GetComponent<Piece>();
-        var beforeMoveX = reference.GetComponent<Piece>().GetxBoard();
-        var beforeMoveY = reference.GetComponent<Piece>().GetyBoard();
+        if (piece == null)
+        {
+            Debug.LogError($"MakeNextMove could not find a Piece component on '{reference.name}'.");
+            return;
+        }
+
+        var beforeMoveX = piece.GetxBoard();
+        var beforeMoveY = piece.GetyBoard();
         var isFastSimulation = IsFastSimulationActive();
 
         if (attack)
@@ -382,6 +407,7 @@ public class Game : MonoBehaviour
 
         piece.SetXBoard(matrixX);
         piece.SetYBoard(matrixY);
+        piece.SetHasMovedState(true);
         piece.SetCoords();
 
         SetPosition(reference);
@@ -389,7 +415,6 @@ public class Game : MonoBehaviour
         var wasPromoted = promotedPiece != reference;
 
         var castled = false;
-        if (piece is King kingMoved) kingMoved.ChangeHasMoved(true);
         if (piece is King movedKing && Math.Abs(beforeMoveX - matrixX) == 2)
         {
             castled = true;
@@ -407,10 +432,9 @@ public class Game : MonoBehaviour
             if (rook != null && rook.GetPlayer() == movedKing.GetPlayer())
             {
                 MovementPatterns.MoveRookAfterCastlingMove(movedKing, rook, this);
-                movedKing.ChangeHasMoved(true);
+                rook.SetHasMovedState(true);
             }
         }
-        if (piece is Rook movedRook) movedRook.SetHasMoved(true);
         if (piece is Pawn pawn && Math.Abs(beforeMoveY - matrixY) == 2)
         {
             SetEnPassantTarget(pawn);

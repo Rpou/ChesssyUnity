@@ -5,7 +5,6 @@ public class Rook : Piece
 {
     private List<Vector2Int> _moveSquares = new List<Vector2Int>();
     private List<Vector2Int> _attackSquares = new List<Vector2Int>();
-    private bool _hasMoved = false;
     private int worth = 5;
     public override King CanSeeKing()
     {
@@ -29,12 +28,12 @@ public class Rook : Piece
 
     public void SetHasMoved(bool hasMoved)
     {
-        _hasMoved = hasMoved;
+        SetHasMovedState(hasMoved);
     }
 
     public bool HasMoved()
     {
-        return _hasMoved;
+        return GetHasMovedState();
     }
 
     public override int GetWorth()

@@ -10,6 +10,7 @@ public abstract class Piece : MonoBehaviour
     private int _xBoard = -1;
     private int _yBoard = -1;
     private bool _player;
+    private bool _hasMoved;
 
     private List<Vector2Int> _moveSquares;
     private List<Vector2Int> _attackSquares;
@@ -91,6 +92,16 @@ public abstract class Piece : MonoBehaviour
     public bool GetPlayer()
     {
         return _player;
+    }
+
+    public bool GetHasMovedState()
+    {
+        return _hasMoved;
+    }
+
+    public void SetHasMovedState(bool hasMoved)
+    {
+        _hasMoved = hasMoved;
     }
 
     public int GetxBoard()

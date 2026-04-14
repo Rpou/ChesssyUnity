@@ -37,6 +37,8 @@ public class GameState
     private bool _disableMoveCache;
     private int? _whitePossibleMoveCount;
     private int? _blackPossibleMoveCount;
+    private bool? _whiteKingInCheckCache;
+    private bool? _blackKingInCheckCache;
 
     private sealed class MoveUndoState
     {
@@ -56,6 +58,8 @@ public class GameState
         public Vector2Int? PreviousEnPassantTargetSquare { get; set; }
         public bool PreviousCurrentPlayer { get; set; }
         public bool PreviousDisableMoveCache { get; set; }
+        public bool? PreviousWhiteKingInCheckCache { get; set; }
+        public bool? PreviousBlackKingInCheckCache { get; set; }
     }
 
     public List<PieceState> PlayerWhite { get; }
@@ -121,6 +125,8 @@ public class GameState
         CurrentPlayerIsWhite = other.CurrentPlayerIsWhite;
         GameOver = other.GameOver;
         EnPassantTargetSquare = other.EnPassantTargetSquare;
+        _whiteKingInCheckCache = other._whiteKingInCheckCache;
+        _blackKingInCheckCache = other._blackKingInCheckCache;
 
         ClonePiecesIntoState(other.PlayerWhite, PlayerWhite);
         ClonePiecesIntoState(other.PlayerBlack, PlayerBlack);
@@ -511,10 +517,31 @@ public class GameState
     /// <param name="player">The player color.</param>
     /// <returns>True if the king is in check.</returns>
     /// <remarks>
-    /// Runtime: O(n), where n is the board width. On an 8x8 board this checks up to 2 pawn squares, 8 knight squares, 8 king
-    /// squares, and at most 56 sliding ray squares, for up to 74 board checks in the worst case.
+    /// Runtime: O(n) the first time this is asked for a given side in the current position, then O(1) for repeated reads
+    /// until the board changes. The uncached check scans up to 2 pawn squares, 8 knight squares, 8 king squares, and at
+    /// most 56 sliding ray squares on an 8x8 board.
     /// </remarks>
     public bool IsKingInCheck(bool currentPlayerIsWhite)
+    {
+        if (currentPlayerIsWhite)
+        {
+            if (!_whiteKingInCheckCache.HasValue)
+            {
+                _whiteKingInCheckCache = CalculateIsKingInCheck(true);
+            }
+
+            return _whiteKingInCheckCache.Value;
+        }
+
+        if (!_blackKingInCheckCache.HasValue)
+        {
+            _blackKingInCheckCache = CalculateIsKingInCheck(false);
+        }
+
+        return _blackKingInCheckCache.Value;
+    }
+
+    private bool CalculateIsKingInCheck(bool currentPlayerIsWhite)
     {
         PieceState king = currentPlayerIsWhite ? _whiteKing : _blackKing;
         if (king == null)
@@ -644,6 +671,7 @@ public class GameState
     {
         moveCache.Clear();
         InvalidatePossibleMoveCountCache();
+        InvalidateKingInCheckCache();
 
         var movingPiece = GetPosition(move.GetFromMatrixX(), move.GetFromMatrixY());
         if (movingPiece == null)
@@ -664,19 +692,14 @@ public class GameState
         movingPiece.MatrixX = move.GetMatrixX();
         movingPiece.MatrixY = move.GetMatrixY();
         _positions[movingPiece.MatrixX, movingPiece.MatrixY] = movingPiece;
+        movingPiece.HasMoved = true;
 
         if (movingPiece.IsKing)
         {
-            movingPiece.HasMoved = true;
             if (Math.Abs(beforeMoveX - move.GetMatrixX()) == 2)
             {
                 MoveRookAfterCastlingMove(beforeMoveX, beforeMoveY, move.GetMatrixX(), movingPiece.CurrentPlayerIsWhite);
             }
-        }
-
-        if (movingPiece.IsRook)
-        {
-            movingPiece.HasMoved = true;
         }
 
         if (movingPiece.IsPawn && Math.Abs(beforeMoveY - move.GetMatrixY()) == 2)
@@ -950,6 +973,12 @@ public class GameState
         amountMoves = 0;
     }
 
+    private void InvalidateKingInCheckCache()
+    {
+        _whiteKingInCheckCache = null;
+        _blackKingInCheckCache = null;
+    }
+
     /// <summary>
     /// Checks whether moving one piece to a target square keeps that player's king safe.
     /// </summary>
@@ -1091,15 +1120,19 @@ public class GameState
             CapturedWasActive = capturedWasActive,
             PreviousEnPassantTargetSquare = EnPassantTargetSquare,
             PreviousCurrentPlayer = CurrentPlayerIsWhite,
-            PreviousDisableMoveCache = _disableMoveCache
+            PreviousDisableMoveCache = _disableMoveCache,
+            PreviousWhiteKingInCheckCache = _whiteKingInCheckCache,
+            PreviousBlackKingInCheckCache = _blackKingInCheckCache
         };
 
         _disableMoveCache = disableMoveCache;
+        InvalidateKingInCheckCache();
 
         _positions[undoState.MovingFromX, undoState.MovingFromY] = null;
         movingPiece.MatrixX = x;
         movingPiece.MatrixY = y;
         _positions[movingPiece.MatrixX, movingPiece.MatrixY] = movingPiece;
+        movingPiece.HasMoved = true;
 
         PieceState castlingRook = null;
         int castlingRookFromX = -1;
@@ -1108,7 +1141,6 @@ public class GameState
 
         if (movingPiece.IsKing)
         {
-            movingPiece.HasMoved = true;
             if (Math.Abs(undoState.MovingFromX - x) == 2)
             {
                 bool isRightRook = x > undoState.MovingFromX;
@@ -1128,10 +1160,6 @@ public class GameState
                     _positions[castlingRook.MatrixX, castlingRook.MatrixY] = castlingRook;
                 }
             }
-        }
-        else if (movingPiece.IsRook)
-        {
-            movingPiece.HasMoved = true;
         }
 
         if (movingPiece.IsPawn && Math.Abs(undoState.MovingFromY - y) == 2)
@@ -1170,6 +1198,8 @@ public class GameState
         CurrentPlayerIsWhite = undoState.PreviousCurrentPlayer;
         EnPassantTargetSquare = undoState.PreviousEnPassantTargetSquare;
         _disableMoveCache = undoState.PreviousDisableMoveCache;
+        _whiteKingInCheckCache = undoState.PreviousWhiteKingInCheckCache;
+        _blackKingInCheckCache = undoState.PreviousBlackKingInCheckCache;
 
         if (undoState.CastlingRook != null)
         {
@@ -1648,17 +1678,7 @@ public class PieceState
     /// </remarks>
     private static bool GetHasMoved(Piece piece)
     {
-        if (piece is King king)
-        {
-            return king.GetHasMoved();
-        }
-
-        if (piece is Rook rook)
-        {
-            return rook.HasMoved();
-        }
-
-        return false;
+        return piece.GetHasMovedState();
     }
 
     /// <summary>

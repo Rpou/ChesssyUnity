@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-
 public class RandomAI : AI
 {
 
@@ -19,6 +18,5 @@ public class RandomAI : AI
         Move move = moves[number];
         game.MakeNextMove(move.GetPiece().gameObject, move.GetMatrixX(), move.GetMatrixY(), move.GetIsAttack());
     }
-
-
 }
+

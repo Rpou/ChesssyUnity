@@ -1,62 +1,25 @@
 using UnityEngine;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System;
-using UnityEngine.Rendering;
-using UnityEditor.Experimental.GraphView;
-
 
 public class MinMax : AI
 {
-
-    private const int MaterialWeight = 100;
-    private const int UnmovedPiecePenalty = 5;
-    private const int MobilityWeight = 1;
     private int evaluatedMoves = 0;
 
     public int maxDepth = 3;
     // 32
     private int Utility(GameState game)
     {
-        int score = 0;
-        // white pieces
-        foreach (var piece in game.GetPieces(true))
-        {
-            if (piece.IsActive)
-            {
-                score += piece.GetWorth() * MaterialWeight;
-                if (!piece.HasMoved && (!piece.IsKing || !piece.IsPawn)) score -= UnmovedPiecePenalty;
-                if (piece.IsInCheck) score -= 80;
-            }
-
-        }
-
-        // black pieces.
-        foreach (var piece in game.GetPieces(false))
-        {
-            if (piece.IsActive)
-            {
-                score -= piece.GetWorth() * MaterialWeight;
-                if (!piece.HasMoved && (!piece.IsKing || !piece.IsPawn)) score -= UnmovedPiecePenalty;
-                if (piece.IsInCheck) score += 80;
-            }
-        }
-
-        //int whiteMobility = game.GetPossibleMoveCount("white");
-        //int blackMobility = game.GetPossibleMoveCount("black");
-        //score += (int)((whiteMobility - blackMobility) * 0.2f);
-
-        return score;
+        return BoardEvaluator.EvaluateCentipawns(game);
     }
 
-    public bool isCutoff(int depth)
+    public bool isCutoff(GameState game, int depth)
     {
         return depth > maxDepth;
     }
 
     public EvalMove MaxValue(GameState game, int depth, int alpha, int beta)
     {
-        if (isCutoff(depth))
+        if (isCutoff(game, depth))
         { // see if we should stop going further down.
             return new EvalMove(Utility(game), null);
         }
@@ -108,7 +71,7 @@ public class MinMax : AI
 
     public EvalMove MinValue(GameState game, int depth, int alpha, int beta)
     {
-        if (isCutoff(depth))
+        if (isCutoff(game, depth))
         { // see if we should stop going further down.
             return new EvalMove(Utility(game), null);
         }
@@ -176,9 +139,13 @@ public class MinMax : AI
     /// </remarks>
     public override void MakeMove(Game game)
     {
+        
         evaluatedMoves = 0;
         GameState gameState = new GameState(game);
+        
         var searchTimer = System.Diagnostics.Stopwatch.StartNew();
+        if(gameState.GetActivePieces(gameState.CurrentPlayerIsWhite).Count + gameState.GetActivePieces(!gameState.CurrentPlayerIsWhite).Count < 13) maxDepth = 5;
+
         EvalMove evmove = game.GetCurrentPlayer()
             ? MaxValue(gameState, 0, int.MinValue, int.MaxValue)
             : MinValue(gameState, 0, int.MinValue, int.MaxValue);
@@ -189,6 +156,17 @@ public class MinMax : AI
         Move move = evmove.move.Value;
         Debug.Log($"MinMax search took {searchTimer.Elapsed.TotalMilliseconds:F2} ms and looked at {evaluatedMoves} moves.");
         GameObject pieceObj = game.GetPosition(move.GetFromMatrixX(), move.GetFromMatrixY());
+        if (pieceObj == null)
+        {
+            Debug.LogError($"MinMax chose {SquareName(move.GetFromMatrixX(), move.GetFromMatrixY())} -> {SquareName(move.GetMatrixX(), move.GetMatrixY())}, but no live piece was found on the source square.");
+            return;
+        }
+
         game.MakeNextMove(pieceObj, move.GetMatrixX(), move.GetMatrixY(), move.GetIsAttack());
+    }
+
+    private static string SquareName(int x, int y)
+    {
+        return $"{(char)('a' + x)}{y + 1}";
     }
 }
