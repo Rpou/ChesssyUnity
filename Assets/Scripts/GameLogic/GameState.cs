@@ -366,7 +366,7 @@ public class GameState
 
         foreach (var attack in attackSquares)
         {
-            if (IsMoveSafe(piece, attack.x, attack.y))
+            if (IsMoveSafe(piece, attack.x, attack.y, true))
             {
                 legalAttackSquares.Add(attack);
             }
@@ -374,7 +374,7 @@ public class GameState
 
         foreach (var move in moveSquares)
         {
-            if (IsMoveSafe(piece, move.x, move.y))
+            if (IsMoveSafe(piece, move.x, move.y, false))
             {
                 legalMoveSquares.Add(move);
             }
@@ -396,8 +396,8 @@ public class GameState
     {
         foreach (var piece in GetPieces(player))
         {
-            if(!piece.IsActive) continue;
-             
+            if (!piece.IsActive) continue;
+
             var (moveSquares, attackSquares) = GetAllLegalMoves(piece);
             if (moveSquares.Count != 0 || attackSquares.Count != 0)
             {
@@ -875,7 +875,7 @@ public class GameState
 
         foreach (var piece in GetPieces(player))
         {
-            if(!piece.IsActive) continue;
+            if (!piece.IsActive) continue;
 
             (List<Vector2Int> pieceMoves, List<Vector2Int> pieceAttacks) = legalOnly
                 ? GetAllLegalMoves(piece)
@@ -919,19 +919,20 @@ public class GameState
     /// <param name="piece">The piece to test.</param>
     /// <param name="x">The target x coordinate.</param>
     /// <param name="y">The target y coordinate.</param>
+    /// <param name="isAttack">Whether the tested move is a capture.</param>
     /// <returns>True if the move does not leave the king in check.</returns>
     /// <remarks>
     /// Runtime: O(checkCost). This applies the move in place, runs one IsKingInCheck call, and then undoes the move again, so
     /// it avoids cloning the whole GameState for each candidate move.
     /// </remarks>
-    private bool IsMoveSafe(PieceState piece, int x, int y)
+    private bool IsMoveSafe(PieceState piece, int x, int y, bool isAttack)
     {
-        var move = new Move(piece.MatrixX, piece.MatrixY, x, y, IsAttackMove(piece, x, y));
-        var undoState = ApplyTemporaryMove(move, move.GetIsAttack());
+        var undoState = ApplyTemporaryMove(piece, x, y, isAttack);
         bool isSafe = !IsKingInCheck(piece.Player);
         UndoTemporaryMove(undoState);
         return isSafe;
     }
+
 
     /// <summary>
     /// Checks whether a piece-state move should be treated as an attack.
@@ -1005,15 +1006,17 @@ public class GameState
     /// <summary>
     /// Applies a move directly to this state so it can be checked and then undone.
     /// </summary>
-    /// <param name="move">The move to apply temporarily.</param>
+    /// <param name="piece">The piece to move temporarily.</param>
+    /// <param name="x">The temporary target x coordinate.</param>
+    /// <param name="y">The temporary target y coordinate.</param>
     /// <param name="isAttack">Whether the move captures a piece.</param>
     /// <returns>The information needed to undo the move again.</returns>
     /// <remarks>
     /// Runtime: O(1). This only updates the touched pieces and board squares, without cloning the whole state.
     /// </remarks>
-    private MoveUndoState ApplyTemporaryMove(Move move, bool isAttack)
+    private MoveUndoState ApplyTemporaryMove(PieceState piece, int x, int y, bool isAttack)
     {
-        var movingPiece = GetPosition(move.GetFromMatrixX(), move.GetFromMatrixY());
+        var movingPiece = GetPosition(piece.MatrixX, piece.MatrixY);
         if (movingPiece == null)
         {
             throw new InvalidOperationException("No piece found on the move's starting square.");
@@ -1026,7 +1029,7 @@ public class GameState
 
         if (isAttack)
         {
-            capturedPiece = GetCapturedPieceForMove(movingPiece, move.GetMatrixX(), move.GetMatrixY());
+            capturedPiece = GetCapturedPieceForMove(movingPiece, x, y);
             if (capturedPiece != null)
             {
                 capturedX = capturedPiece.MatrixX;
@@ -1056,8 +1059,8 @@ public class GameState
         _disableMoveCache = true;
 
         _positions[undoState.MovingFromX, undoState.MovingFromY] = null;
-        movingPiece.MatrixX = move.GetMatrixX();
-        movingPiece.MatrixY = move.GetMatrixY();
+        movingPiece.MatrixX = x;
+        movingPiece.MatrixY = y;
         _positions[movingPiece.MatrixX, movingPiece.MatrixY] = movingPiece;
 
         PieceState castlingRook = null;
@@ -1068,12 +1071,12 @@ public class GameState
         if (movingPiece.IsKing)
         {
             movingPiece.HasMoved = true;
-            if (Math.Abs(undoState.MovingFromX - move.GetMatrixX()) == 2)
+            if (Math.Abs(undoState.MovingFromX - x) == 2)
             {
-                bool isRightRook = move.GetMatrixX() > undoState.MovingFromX;
+                bool isRightRook = x > undoState.MovingFromX;
                 castlingRookFromX = isRightRook ? undoState.MovingFromX + 3 : undoState.MovingFromX - 4;
                 castlingRookFromY = undoState.MovingFromY;
-                int rookToX = isRightRook ? move.GetMatrixX() - 1 : move.GetMatrixX() + 1;
+                int rookToX = isRightRook ? x - 1 : x + 1;
 
                 castlingRook = GetPosition(castlingRookFromX, castlingRookFromY);
                 if (castlingRook != null)
@@ -1092,7 +1095,7 @@ public class GameState
             movingPiece.HasMoved = true;
         }
 
-        if (movingPiece.IsPawn && Math.Abs(undoState.MovingFromY - move.GetMatrixY()) == 2)
+        if (movingPiece.IsPawn && Math.Abs(undoState.MovingFromY - y) == 2)
         {
             EnPassantTargetSquare = new Vector2Int(movingPiece.MatrixX, movingPiece.MatrixY);
         }
@@ -1269,8 +1272,8 @@ public class GameState
             if (rookRight != null && rookRight.IsRook && !rookRight.HasMoved &&
                 GetPosition(x + 1, y) == null && GetPosition(x + 2, y) == null &&
                 !kingStartsInCheck &&
-                IsMoveSafe(piece, x + 1, y) &&
-                IsMoveSafe(piece, x + 2, y))
+                IsMoveSafe(piece, x + 1, y, false) &&
+                IsMoveSafe(piece, x + 2, y, false))
             {
                 moveSquares.Add(new Vector2Int(x + 2, y));
             }
@@ -1278,8 +1281,8 @@ public class GameState
             if (rookLeft != null && rookLeft.IsRook && !rookLeft.HasMoved &&
                 GetPosition(x - 1, y) == null && GetPosition(x - 2, y) == null && GetPosition(x - 3, y) == null &&
                 !kingStartsInCheck &&
-                IsMoveSafe(piece, x - 1, y) &&
-                IsMoveSafe(piece, x - 2, y))
+                IsMoveSafe(piece, x - 1, y, false) &&
+                IsMoveSafe(piece, x - 2, y, false))
             {
                 moveSquares.Add(new Vector2Int(x - 2, y));
             }
