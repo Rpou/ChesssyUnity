@@ -119,7 +119,7 @@ public static class MovementPatterns
             var player = piece.GetPlayer();
             GameObject rookLeft;
             GameObject rookRight;
-            if (player == "white")
+            if (player)
             {
                 rookLeft = game.GetPosition(0, 0);
                 rookRight = game.GetPosition(7, 0);
@@ -132,7 +132,8 @@ public static class MovementPatterns
 
             var kingStartsInCheck = game.CheckIfKingInCheck(player, true) != null;
 
-            if (rookRight != null && rookRight.GetComponent<Piece>() is Rook rightRook && 
+            if (rookRight != null && rookRight.GetComponent<Piece>() is Rook rightRook &&
+                rightRook.GetPlayer() == king.GetPlayer() &&
                 game.GetPosition(x + 1, y) == null && game.GetPosition(x + 2, y) == null && !rightRook.HasMoved() &&
                 !kingStartsInCheck &&
                 IsMoveSafe(x + 1, y, king, game) &&
@@ -141,6 +142,7 @@ public static class MovementPatterns
                 moveSquares.Add(CreateCastlingMove(king, rightRook));
             }
             if (rookLeft != null && rookLeft.GetComponent<Piece>() is Rook leftRook &&
+                leftRook.GetPlayer() == king.GetPlayer() &&
                 game.GetPosition(x - 1, y) == null && game.GetPosition(x - 2, y) == null && game.GetPosition(x - 3, y) == null && !leftRook.HasMoved() &&
                 !kingStartsInCheck &&
                 IsMoveSafe(x - 1, y, king, game) &&
@@ -267,8 +269,8 @@ public static class MovementPatterns
 
         int x = piece.GetxBoard();
         int y = piece.GetyBoard();
-        int direction = piece.GetPlayer().Equals("white") ? 1 : -1;
-        int startRow = piece.GetPlayer().Equals("white") ? 1 : 6;
+        int direction = piece.GetPlayer() ? 1 : -1;
+        int startRow = piece.GetPlayer() ? 1 : 6;
 
         // Forward move
         if (game.PositionOnBoard(x, y + direction) && game.GetPosition(x, y + direction) == null)
@@ -347,7 +349,7 @@ public static class MovementPatterns
         // Handle en passant simulation where the captured pawn is not on the destination square.
         if (capturedPiece == null && piece is Pawn pawn)
         {
-            int direction = pawn.GetPlayer().Equals("white") ? 1 : -1;
+            int direction = pawn.GetPlayer() ? 1 : -1;
             int enPassantPawnY = y - direction;
             if (x != correctX && y - correctY == direction && game.PositionOnBoard(x, enPassantPawnY))
             {

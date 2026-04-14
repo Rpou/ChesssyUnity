@@ -54,13 +54,13 @@ public class GameState
         public int CastlingRookFromY { get; set; }
         public bool CastlingRookHadMoved { get; set; }
         public Vector2Int? PreviousEnPassantTargetSquare { get; set; }
-        public string PreviousCurrentPlayer { get; set; }
+        public bool PreviousCurrentPlayer { get; set; }
         public bool PreviousDisableMoveCache { get; set; }
     }
 
     public List<PieceState> PlayerWhite { get; }
     public List<PieceState> PlayerBlack { get; }
-    public string CurrentPlayer { get; private set; }
+    public bool CurrentPlayerIsWhite { get; private set; }
     public bool GameOver { get; private set; }
     public Vector2Int? EnPassantTargetSquare { get; private set; }
     public int amountMoves { get; private set; }
@@ -94,12 +94,12 @@ public class GameState
     /// <remarks>
     /// Runtime: O(p), where p is the number of stored pieces. RebuildPositions visits at most 32 piece states.
     /// </remarks>
-    private GameState(List<PieceState> playerWhite, List<PieceState> playerBlack, string currentPlayer,
+    private GameState(List<PieceState> playerWhite, List<PieceState> playerBlack, bool currentPlayerIsWhite,
         bool gameOver, Vector2Int? enPassantTargetSquare)
     {
         PlayerWhite = playerWhite;
         PlayerBlack = playerBlack;
-        CurrentPlayer = currentPlayer;
+        CurrentPlayerIsWhite = currentPlayerIsWhite;
         GameOver = gameOver;
         EnPassantTargetSquare = enPassantTargetSquare;
 
@@ -118,7 +118,7 @@ public class GameState
     {
         PlayerWhite = new List<PieceState>(other.PlayerWhite.Count);
         PlayerBlack = new List<PieceState>(other.PlayerBlack.Count);
-        CurrentPlayer = other.CurrentPlayer;
+        CurrentPlayerIsWhite = other.CurrentPlayerIsWhite;
         GameOver = other.GameOver;
         EnPassantTargetSquare = other.EnPassantTargetSquare;
 
@@ -134,9 +134,9 @@ public class GameState
     /// <remarks>
     /// Runtime: O(1). This only returns one of the two stored lists.
     /// </remarks>
-    public List<PieceState> GetPieces(string player)
+    public List<PieceState> GetPieces(bool currentPlayerIsWhite)
     {
-        return player == "black" ? PlayerBlack : PlayerWhite;
+        return currentPlayerIsWhite ? PlayerWhite : PlayerBlack;
     }
 
     /// <summary>
@@ -147,11 +147,11 @@ public class GameState
     /// <remarks>
     /// Runtime: O(p), where p is the number of pieces for that player. In chess this loops through at most 16 pieces.
     /// </remarks>
-    public List<PieceState> GetActivePieces(string player)
+    public List<PieceState> GetActivePieces(bool currentPlayerIsWhite)
     {
         var activePieces = new List<PieceState>();
 
-        foreach (var piece in GetPieces(player))
+        foreach (var piece in GetPieces(currentPlayerIsWhite))
         {
             if (piece.IsActive)
             {
@@ -241,33 +241,33 @@ public class GameState
     /// returned as legal. In practice this loops through at most 16 active pieces, and each piece can test up to about 27
     /// candidate targets before filtering.
     /// </remarks>
-    public List<Move> GetPossibleMoves(string player)
+    public List<Move> GetPossibleMoves(bool currentPlayerIsWhite)
     {
-        var moves = GetMoves(player, true);
+        var moves = GetMoves(currentPlayerIsWhite, true);
 
         if (!_disableMoveCache)
         {
-            CachePossibleMoveCount(player, moves.Count);
+            CachePossibleMoveCount(currentPlayerIsWhite, moves.Count);
         }
 
         return moves;
     }
 
-    public int GetPossibleMoveCount(string player)
+    public int GetPossibleMoveCount(bool currentPlayerIsWhite)
     {
         if (_disableMoveCache)
         {
-            return GetMoves(player, true).Count;
+            return GetMoves(currentPlayerIsWhite, true).Count;
         }
 
-        int? cachedCount = player == "white" ? _whitePossibleMoveCount : _blackPossibleMoveCount;
+        int? cachedCount = currentPlayerIsWhite ? _whitePossibleMoveCount : _blackPossibleMoveCount;
         if (cachedCount.HasValue)
         {
             return cachedCount.Value;
         }
 
-        int moveCount = GetMoves(player, true).Count;
-        CachePossibleMoveCount(player, moveCount);
+        int moveCount = GetMoves(currentPlayerIsWhite, true).Count;
+        CachePossibleMoveCount(currentPlayerIsWhite, moveCount);
         return moveCount;
     }
 
@@ -280,14 +280,14 @@ public class GameState
     /// </remarks>
     public List<Move> GetPossibleMoves()
     {
-        var moves = GetPossibleMoves(CurrentPlayer);
+        var moves = GetPossibleMoves(CurrentPlayerIsWhite);
         amountMoves = moves.Count;
         return moves;
     }
 
     public int GetPossibleMoveCount()
     {
-        int moveCount = GetPossibleMoveCount(CurrentPlayer);
+        int moveCount = GetPossibleMoveCount(CurrentPlayerIsWhite);
         amountMoves = moveCount;
         return moveCount;
     }
@@ -301,9 +301,9 @@ public class GameState
     /// Runtime: O(p * c), where p is the number of active pieces and c is the number of raw targets per piece. In the loose
     /// chess worst case this loops through at most 16 active pieces and collects up to about 27 targets per piece. 432
     /// </remarks>
-    public List<Move> GetAllPossibleMoves(string player)
+    public List<Move> GetAllPossibleMoves(bool currentPlayerIsWhite)
     {
-        return GetMoves(player, false);
+        return GetMoves(currentPlayerIsWhite, false);
     }
 
     /// <summary>
@@ -315,7 +315,7 @@ public class GameState
     /// </remarks>
     public List<Move> GetAllPossibleMoves()
     {
-        return GetAllPossibleMoves(CurrentPlayer);
+        return GetAllPossibleMoves(CurrentPlayerIsWhite);
     }
 
     /// <summary>
@@ -393,9 +393,17 @@ public class GameState
     /// Runtime: O(p * legalMoveCost). In the worst case this checks all 16 active pieces before finding a legal move or
     /// deciding there are none.
     /// </remarks>
-    public bool AnyLegalMoves(string player)
+    public bool AnyLegalMoves(bool currentPlayerIsWhite)
     {
-        foreach (var piece in GetPieces(player))
+        var myking = currentPlayerIsWhite ? _whiteKing : _blackKing;
+        var (kingmoveSquares, kingattackSquares) = GetAllLegalMoves(myking);
+        // check king first, as it is most likely to have a move.
+        if (kingmoveSquares.Count != 0 || kingattackSquares.Count != 0)
+        {
+            return true;
+        }
+
+        foreach (var piece in GetPieces(currentPlayerIsWhite))
         {
             if (!piece.IsActive) continue;
 
@@ -506,9 +514,9 @@ public class GameState
     /// Runtime: O(n), where n is the board width. On an 8x8 board this checks up to 2 pawn squares, 8 knight squares, 8 king
     /// squares, and at most 56 sliding ray squares, for up to 74 board checks in the worst case.
     /// </remarks>
-    public bool IsKingInCheck(string player)
+    public bool IsKingInCheck(bool currentPlayerIsWhite)
     {
-        PieceState king = player == "white" ? _whiteKing : _blackKing;
+        PieceState king = currentPlayerIsWhite ? _whiteKing : _blackKing;
         if (king == null)
         {
             return false;
@@ -519,9 +527,7 @@ public class GameState
             return false;
         }
 
-        var opponent = player == "white" ? "black" : "white";
-
-        return IsSquareAttacked(king.MatrixX, king.MatrixY, opponent);
+        return IsSquareAttacked(king.MatrixX, king.MatrixY, !currentPlayerIsWhite);
     }
 
     /// <summary>
@@ -535,23 +541,23 @@ public class GameState
     /// Runtime: O(n), where n is the board width. On an 8x8 board this checks up to 2 pawn squares, 8 knight squares, 8 king
     /// squares, and at most 56 sliding ray squares, for up to 74 board checks in the worst case.
     /// </remarks>
-    public bool IsSquareAttacked(int x, int y, string attackingPlayer)
+    public bool IsSquareAttacked(int x, int y, bool attackingPlayer)
     {
         if (!PositionOnBoard(x, y))
         {
             return false;
         }
 
-        int pawnSourceY = attackingPlayer == "white" ? y - 1 : y + 1;
+        int pawnSourceY = attackingPlayer ? y - 1 : y + 1;
 
         PieceState pawnRight = GetPosition(x + 1, pawnSourceY);
-        if (pawnRight != null && pawnRight.IsActive && pawnRight.Player == attackingPlayer && pawnRight.IsPawn)
+        if (pawnRight != null && pawnRight.IsActive && pawnRight.CurrentPlayerIsWhite == attackingPlayer && pawnRight.IsPawn)
         {
             return true;
         }
 
         PieceState pawnLeft = GetPosition(x - 1, pawnSourceY);
-        if (pawnLeft != null && pawnLeft.IsActive && pawnLeft.Player == attackingPlayer && pawnLeft.IsPawn)
+        if (pawnLeft != null && pawnLeft.IsActive && pawnLeft.CurrentPlayerIsWhite == attackingPlayer && pawnLeft.IsPawn)
         {
             return true;
         }
@@ -559,7 +565,7 @@ public class GameState
         foreach (var offset in KnightOffsets)
         {
             PieceState knight = GetPosition(x + offset.x, y + offset.y);
-            if (knight != null && knight.IsActive && knight.Player == attackingPlayer && knight.IsKnight)
+            if (knight != null && knight.IsActive && knight.CurrentPlayerIsWhite == attackingPlayer && knight.IsKnight)
             {
                 return true;
             }
@@ -568,7 +574,7 @@ public class GameState
         foreach (var offset in KingOffsets)
         {
             PieceState king = GetPosition(x + offset.x, y + offset.y);
-            if (king != null && king.IsActive && king.Player == attackingPlayer && king.IsKing)
+            if (king != null && king.IsActive && king.CurrentPlayerIsWhite == attackingPlayer && king.IsKing)
             {
                 return true;
             }
@@ -591,7 +597,7 @@ public class GameState
     /// Runtime: O(n), where n is the board width. On an 8x8 board each call scans 4 rays and walks at most 28 squares before
     /// it either finds a blocker or leaves the board.
     /// </remarks>
-    private bool IsSlidingAttack(int targetX, int targetY, string attackingPlayer, Vector2Int[] directions,
+    private bool IsSlidingAttack(int targetX, int targetY, bool attackingPlayer, Vector2Int[] directions,
         bool rookLikeAttack)
     {
         foreach (var direction in directions)
@@ -609,7 +615,7 @@ public class GameState
                     continue;
                 }
 
-                if (!piece.IsActive || piece.Player != attackingPlayer)
+                if (!piece.IsActive || piece.CurrentPlayerIsWhite != attackingPlayer)
                 {
                     break;
                 }
@@ -664,7 +670,7 @@ public class GameState
             movingPiece.HasMoved = true;
             if (Math.Abs(beforeMoveX - move.GetMatrixX()) == 2)
             {
-                MoveRookAfterCastlingMove(beforeMoveX, beforeMoveY, move.GetMatrixX());
+                MoveRookAfterCastlingMove(beforeMoveX, beforeMoveY, move.GetMatrixX(), movingPiece.CurrentPlayerIsWhite);
             }
         }
 
@@ -687,7 +693,7 @@ public class GameState
             movingPiece.PromoteToQueen();
         }
 
-        CurrentPlayer = CurrentPlayer == "white" ? "black" : "white";
+        CurrentPlayerIsWhite = !CurrentPlayerIsWhite;
     }
 
     /// <summary>
@@ -730,14 +736,14 @@ public class GameState
     /// <remarks>
     /// Runtime: O(1). This does one rook lookup and one rook reposition.
     /// </remarks>
-    private void MoveRookAfterCastlingMove(int kingFromX, int kingY, int kingToX)
+    private void MoveRookAfterCastlingMove(int kingFromX, int kingY, int kingToX, bool kingIsWhite)
     {
         var isRightRook = kingToX > kingFromX;
         var rookFromX = isRightRook ? kingFromX + 3 : kingFromX - 4;
         var rookToX = isRightRook ? kingToX - 1 : kingToX + 1;
         var rook = GetPosition(rookFromX, kingY);
 
-        if (rook == null)
+        if (rook == null || !rook.IsRook || rook.CurrentPlayerIsWhite != kingIsWhite)
         {
             return;
         }
@@ -870,7 +876,7 @@ public class GameState
             return;
         }
 
-        if (piece.Player == "white")
+        if (piece.CurrentPlayerIsWhite)
         {
             _whiteKing = piece;
             return;
@@ -899,12 +905,12 @@ public class GameState
     /// Runtime: O(p * c) for raw moves and O(p * c * safetyCheck) for legal moves. In the loose chess worst case this loops
     /// through at most 16 active pieces and can inspect up to about 27 candidate targets per piece. 432
     /// </remarks>
-    private List<Move> GetMoves(string player, bool legalOnly)
+    private List<Move> GetMoves(bool currentPlayerIsWhite, bool legalOnly)
     {
         var possibleMoves = new List<Move>();
         var possibleAttackMoves = new List<Move>();
 
-        foreach (var piece in GetPieces(player))
+        foreach (var piece in GetPieces(currentPlayerIsWhite))
         {
             if (!piece.IsActive) continue;
 
@@ -926,9 +932,9 @@ public class GameState
         return possibleAttackMoves;
     }
 
-    private void CachePossibleMoveCount(string player, int moveCount)
+    private void CachePossibleMoveCount(bool currentPlayerIsWhite, int moveCount)
     {
-        if (player == "white")
+        if (currentPlayerIsWhite)
         {
             _whitePossibleMoveCount = moveCount;
             return;
@@ -959,7 +965,7 @@ public class GameState
     private bool IsMoveSafe(PieceState piece, int x, int y, bool isAttack)
     {
         var undoState = ApplyTemporaryMove(piece, x, y, isAttack, true);
-        bool isSafe = !IsKingInCheck(piece.Player);
+        bool isSafe = !IsKingInCheck(piece.CurrentPlayerIsWhite);
         UndoTemporaryMove(undoState);
         return isSafe;
     }
@@ -1016,7 +1022,7 @@ public class GameState
         }
 
         var enPassantTarget = EnPassantTargetSquare.Value;
-        var direction = movingPiece.Player == "white" ? 1 : -1;
+        var direction = movingPiece.CurrentPlayerIsWhite ? 1 : -1;
         var isDiagonalPawnMove = matrixX != movingPiece.MatrixX &&
                                  matrixY - movingPiece.MatrixY == direction;
 
@@ -1026,7 +1032,7 @@ public class GameState
         }
 
         var enPassantPawn = GetPosition(enPassantTarget.x, enPassantTarget.y);
-        if (enPassantPawn != null && enPassantPawn.IsPawn && enPassantPawn.Player != movingPiece.Player)
+        if (enPassantPawn != null && enPassantPawn.IsPawn && enPassantPawn.CurrentPlayerIsWhite != movingPiece.CurrentPlayerIsWhite)
         {
             return enPassantPawn;
         }
@@ -1084,7 +1090,7 @@ public class GameState
             CapturedY = capturedY,
             CapturedWasActive = capturedWasActive,
             PreviousEnPassantTargetSquare = EnPassantTargetSquare,
-            PreviousCurrentPlayer = CurrentPlayer,
+            PreviousCurrentPlayer = CurrentPlayerIsWhite,
             PreviousDisableMoveCache = _disableMoveCache
         };
 
@@ -1111,7 +1117,8 @@ public class GameState
                 int rookToX = isRightRook ? x - 1 : x + 1;
 
                 castlingRook = GetPosition(castlingRookFromX, castlingRookFromY);
-                if (castlingRook != null)
+                if (castlingRook != null && castlingRook.IsRook &&
+                    castlingRook.CurrentPlayerIsWhite == movingPiece.CurrentPlayerIsWhite)
                 {
                     castlingRookHadMoved = castlingRook.HasMoved;
                     _positions[castlingRookFromX, castlingRookFromY] = null;
@@ -1141,7 +1148,7 @@ public class GameState
             movingPiece.PromoteToQueen();
         }
 
-        CurrentPlayer = CurrentPlayer == "white" ? "black" : "white";
+        CurrentPlayerIsWhite = !CurrentPlayerIsWhite;
 
         undoState.CastlingRook = castlingRook;
         undoState.CastlingRookFromX = castlingRookFromX;
@@ -1160,7 +1167,7 @@ public class GameState
     /// </remarks>
     private void UndoTemporaryMove(MoveUndoState undoState)
     {
-        CurrentPlayer = undoState.PreviousCurrentPlayer;
+        CurrentPlayerIsWhite = undoState.PreviousCurrentPlayer;
         EnPassantTargetSquare = undoState.PreviousEnPassantTargetSquare;
         _disableMoveCache = undoState.PreviousDisableMoveCache;
 
@@ -1219,7 +1226,7 @@ public class GameState
         if (PositionOnBoard(x, y))
         {
             var pieceOnSquare = GetPosition(x, y);
-            if (pieceOnSquare != null && pieceOnSquare.Player != piece.Player)
+            if (pieceOnSquare != null && pieceOnSquare.CurrentPlayerIsWhite != piece.CurrentPlayerIsWhite)
             {
                 attackableSquares.Add(new Vector2Int(x, y));
             }
@@ -1254,7 +1261,7 @@ public class GameState
         {
             movableSquares.Add(new Vector2Int(x, y));
         }
-        else if (pieceOnSquare.Player != piece.Player)
+        else if (pieceOnSquare.CurrentPlayerIsWhite != piece.CurrentPlayerIsWhite)
         {
             attackableSquares.Add(new Vector2Int(x, y));
         }
@@ -1288,7 +1295,7 @@ public class GameState
         {
             PieceState rookLeft;
             PieceState rookRight;
-            if (piece.Player == "white")
+            if (piece.CurrentPlayerIsWhite)
             {
                 rookLeft = GetPosition(0, 0);
                 rookRight = GetPosition(7, 0);
@@ -1299,9 +1306,10 @@ public class GameState
                 rookRight = GetPosition(7, 7);
             }
 
-            var kingStartsInCheck = IsKingInCheck(piece.Player);
+            var kingStartsInCheck = IsKingInCheck(piece.CurrentPlayerIsWhite);
 
-            if (rookRight != null && rookRight.IsRook && !rookRight.HasMoved &&
+            if (rookRight != null && rookRight.IsRook && rookRight.CurrentPlayerIsWhite == piece.CurrentPlayerIsWhite &&
+                !rookRight.HasMoved &&
                 GetPosition(x + 1, y) == null && GetPosition(x + 2, y) == null &&
                 !kingStartsInCheck &&
                 IsMoveSafe(piece, x + 1, y, false) &&
@@ -1310,7 +1318,8 @@ public class GameState
                 moveSquares.Add(new Vector2Int(x + 2, y));
             }
 
-            if (rookLeft != null && rookLeft.IsRook && !rookLeft.HasMoved &&
+            if (rookLeft != null && rookLeft.IsRook && rookLeft.CurrentPlayerIsWhite == piece.CurrentPlayerIsWhite &&
+                !rookLeft.HasMoved &&
                 GetPosition(x - 1, y) == null && GetPosition(x - 2, y) == null && GetPosition(x - 3, y) == null &&
                 !kingStartsInCheck &&
                 IsMoveSafe(piece, x - 1, y, false) &&
@@ -1462,8 +1471,8 @@ public class GameState
 
         int x = piece.MatrixX;
         int y = piece.MatrixY;
-        int direction = piece.Player == "white" ? 1 : -1;
-        int startRow = piece.Player == "white" ? 1 : 6;
+        int direction = piece.CurrentPlayerIsWhite ? 1 : -1;
+        int startRow = piece.CurrentPlayerIsWhite ? 1 : 6;
 
         if (PositionOnBoard(x, y + direction) && GetPosition(x, y + direction) == null)
         {
@@ -1478,13 +1487,13 @@ public class GameState
         int attackY = y + direction;
 
         if (PositionOnBoard(x + 1, attackY) && GetPosition(x + 1, attackY) != null &&
-            GetPosition(x + 1, attackY).Player != piece.Player)
+            GetPosition(x + 1, attackY).CurrentPlayerIsWhite != piece.CurrentPlayerIsWhite)
         {
             attackSquares.Add(new Vector2Int(x + 1, attackY));
         }
 
         if (PositionOnBoard(x - 1, attackY) && GetPosition(x - 1, attackY) != null &&
-            GetPosition(x - 1, attackY).Player != piece.Player)
+            GetPosition(x - 1, attackY).CurrentPlayerIsWhite != piece.CurrentPlayerIsWhite)
         {
             attackSquares.Add(new Vector2Int(x - 1, attackY));
         }
@@ -1495,7 +1504,7 @@ public class GameState
         }
 
         var enPassantTarget = GetPosition(EnPassantTargetSquare.Value.x, EnPassantTargetSquare.Value.y);
-        if (enPassantTarget == null || !enPassantTarget.IsPawn || enPassantTarget.Player == piece.Player)
+        if (enPassantTarget == null || !enPassantTarget.IsPawn || enPassantTarget.CurrentPlayerIsWhite == piece.CurrentPlayerIsWhite)
         {
             return (moveSquares, attackSquares);
         }
@@ -1522,7 +1531,7 @@ public class GameState
 public class PieceState
 {
     public string Name { get; private set; }
-    public string Player { get; }
+    public bool CurrentPlayerIsWhite { get; }
     public int MatrixX { get; set; }
     public int MatrixY { get; set; }
     public bool IsActive { get; set; }
@@ -1549,11 +1558,11 @@ public class PieceState
     /// <remarks>
     /// Runtime: O(1). This only stores the provided values.
     /// </remarks>
-    private PieceState(string name, string player, int matrixX, int matrixY, bool isActive, bool hasMoved,
+    private PieceState(string name, bool currentPlayerIsWhite, int matrixX, int matrixY, bool isActive, bool hasMoved,
         bool isInCheck)
     {
         Name = name;
-        Player = player;
+        CurrentPlayerIsWhite = currentPlayerIsWhite;
         MatrixX = matrixX;
         MatrixY = matrixY;
         IsActive = isActive;
@@ -1585,7 +1594,7 @@ public class PieceState
     /// </remarks>
     public PieceState Clone()
     {
-        return new PieceState(Name, Player, MatrixX, MatrixY, IsActive, HasMoved, IsInCheck);
+        return new PieceState(Name, CurrentPlayerIsWhite, MatrixX, MatrixY, IsActive, HasMoved, IsInCheck);
     }
 
     /// <summary>
@@ -1614,7 +1623,7 @@ public class PieceState
     /// </remarks>
     public void PromoteToQueen()
     {
-        Name = Player + "_queen";
+        Name = CurrentPlayerIsWhite ? "white_queen" : "black_queen";
     }
 
     /// <summary>

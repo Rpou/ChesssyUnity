@@ -1090,6 +1090,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d9fc2bfc3db6d35478b790f0224b44a7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MinMax
+  maxDepth: 3
 --- !u!4 &1039235328
 Transform:
   m_ObjectHideFlags: 0
@@ -1134,6 +1135,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d9fc2bfc3db6d35478b790f0224b44a7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MinMax
+  maxDepth: 3
 --- !u!4 &1149389161
 Transform:
   m_ObjectHideFlags: 0

@@ -9,7 +9,7 @@ public abstract class Piece : MonoBehaviour
     
     private int _xBoard = -1;
     private int _yBoard = -1;
-    private string _player;
+    private bool _player;
 
     private List<Vector2Int> _moveSquares;
     private List<Vector2Int> _attackSquares;
@@ -30,7 +30,7 @@ public abstract class Piece : MonoBehaviour
         }
 
         // Determine player color based on name
-        _player = name.StartsWith("black") ? "black" : "white";
+        _player = name.StartsWith("black") ? false : true;
 
         // Set position on board
         SetCoords();
@@ -43,7 +43,7 @@ public abstract class Piece : MonoBehaviour
 
     private void Start()
     {
-        if (game != null && spriteManager != null && !string.IsNullOrEmpty(_player))
+        if (game != null && spriteManager != null)
         {
             return;
         }
@@ -88,7 +88,7 @@ public abstract class Piece : MonoBehaviour
         this.transform.position = new Vector3(x, y, -1.0f);
     }
 
-    public string GetPlayer()
+    public bool GetPlayer()
     {
         return _player;
     }

@@ -9,7 +9,7 @@ namespace GameLogic
         {
             return string.Join(" ",
                 BuildBoard(game),
-                game.GetCurrentPlayer() == "white" ? "w" : "b",
+                game.GetCurrentPlayer() ? "w" : "b",
                 BuildCastlingAvailability(game),
                 BuildEnPassantSquare(game),
                 Math.Max(0, game.GetHalfmoveClock()).ToString(),
@@ -20,7 +20,7 @@ namespace GameLogic
         {
             return string.Join(" ",
                 BuildBoard(state),
-                state.CurrentPlayer == "white" ? "w" : "b",
+                state.CurrentPlayerIsWhite ? "w" : "b",
                 BuildCastlingAvailability(state),
                 BuildEnPassantSquare(state),
                 Math.Max(0, halfmoveClock).ToString(),
@@ -112,8 +112,8 @@ namespace GameLogic
         {
             var castling = new StringBuilder();
 
-            AppendCastlingRights(state, "white", 0, 'K', 'Q', castling);
-            AppendCastlingRights(state, "black", 7, 'k', 'q', castling);
+            AppendCastlingRights(state, true, 0, 'K', 'Q', castling);
+            AppendCastlingRights(state, false, 7, 'k', 'q', castling);
 
             return castling.Length == 0 ? "-" : castling.ToString();
         }
@@ -128,7 +128,7 @@ namespace GameLogic
             return castling.Length == 0 ? "-" : castling.ToString();
         }
 
-        private static void AppendCastlingRights(GameState state, string player, int homeRank,
+        private static void AppendCastlingRights(GameState state, bool player, int homeRank,
             char kingSideSymbol, char queenSideSymbol, StringBuilder castling)
         {
             var king = state.GetPosition(4, homeRank);
@@ -172,20 +172,20 @@ namespace GameLogic
             }
         }
 
-        private static bool IsEligibleKing(PieceState piece, string player)
+        private static bool IsEligibleKing(PieceState piece, bool player)
         {
             return piece != null &&
                    piece.IsKing &&
-                   piece.Player == player &&
+                   piece.CurrentPlayerIsWhite == player &&
                    piece.IsActive &&
                    !piece.HasMoved;
         }
 
-        private static bool IsEligibleRook(PieceState piece, string player)
+        private static bool IsEligibleRook(PieceState piece, bool player)
         {
             return piece != null &&
                    piece.IsRook &&
-                   piece.Player == player &&
+                   piece.CurrentPlayerIsWhite == player &&
                    piece.IsActive &&
                    !piece.HasMoved;
         }
@@ -204,7 +204,7 @@ namespace GameLogic
                 return "-";
             }
 
-            var targetY = pawnSquare.y + (pawn.Player == "white" ? -1 : 1);
+            var targetY = pawnSquare.y + (pawn.CurrentPlayerIsWhite ? -1 : 1);
             if (!state.PositionOnBoard(pawnSquare.x, targetY))
             {
                 return "-";
@@ -221,7 +221,7 @@ namespace GameLogic
                 return "-";
             }
 
-            var targetY = pawn.GetyBoard() + (pawn.GetPlayer() == "white" ? -1 : 1);
+            var targetY = pawn.GetyBoard() + (pawn.GetPlayer() ? -1 : 1);
             if (!game.PositionOnBoard(pawn.GetxBoard(), targetY))
             {
                 return "-";
@@ -241,7 +241,7 @@ namespace GameLogic
             else if (piece.IsQueen) symbol = 'q';
             else symbol = 'k';
 
-            return piece.Player == "white" ? char.ToUpperInvariant(symbol) : symbol;
+            return piece.CurrentPlayerIsWhite ? char.ToUpperInvariant(symbol) : symbol;
         }
 
         private static char ToFenPiece(Piece piece)
@@ -255,7 +255,7 @@ namespace GameLogic
             else if (piece is Queen) symbol = 'q';
             else symbol = 'k';
 
-            return piece.GetPlayer() == "white" ? char.ToUpperInvariant(symbol) : symbol;
+            return piece.GetPlayer() ? char.ToUpperInvariant(symbol) : symbol;
         }
 
         private static T GetLivePiece<T>(Game game, int x, int y) where T : Piece
