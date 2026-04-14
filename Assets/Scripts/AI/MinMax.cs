@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System;
 
 
 public class MinMax : AI
@@ -9,9 +10,11 @@ public class MinMax : AI
     private const int MaterialWeight = 10;
     private const int UnmovedPiecePenalty = 1;
     private const int MobilityWeight = 1;
+    private int i = 0;
     // 32
     private int Utility(GameState game)
     {
+        i += 1;
         int score = 0;
         foreach (var piece in game.GetPieces("white"))
         {
@@ -34,9 +37,9 @@ public class MinMax : AI
             }
         }
 
-        int whiteMobility = game.GetPossibleMoveCount("white");
-        int blackMobility = game.GetPossibleMoveCount("black");
-        score += (int)((whiteMobility - blackMobility) * 0.2f);
+        //int whiteMobility = game.GetPossibleMoveCount("white");
+        //int blackMobility = game.GetPossibleMoveCount("black");
+        //score += (int)((whiteMobility - blackMobility) * 0.2f);
 
         return score;
     }
@@ -48,8 +51,7 @@ public class MinMax : AI
 
     public EvalMove MaxValue(GameState game, int depth, int alpha, int beta)
     {
-        List<Move> allmoves = game.GetPossibleMoves(); // find all legal moves.
-        List<Move> moves = game.SortAttack(allmoves);
+        List<Move> moves = game.GetPossibleMoves(); // find all legal moves.
 
         if (isCutoff(depth) || moves.Count == 0)
         { // see if we should stop going further down.
@@ -82,8 +84,7 @@ public class MinMax : AI
 
     public EvalMove MinValue(GameState game, int depth, int alpha, int beta)
     {
-        List<Move> allmoves = game.GetPossibleMoves(); // find all legal moves.
-        List<Move> moves = game.SortAttack(allmoves);
+        List<Move> moves = game.GetPossibleMoves(); // find all legal moves.
         if (isCutoff(depth) || moves.Count == 0)
         { // see if we should stop going further down.
             return new EvalMove(Utility(game), null);
@@ -132,15 +133,18 @@ public class MinMax : AI
     /// </remarks>
     public override void MakeMove(Game game)
     {
-
+        i = 0;
         GameState gameState = new GameState(game);
+        var searchTimer = System.Diagnostics.Stopwatch.StartNew();
         EvalMove evmove = game.GetCurrentPlayer() == "white"
             ? MaxValue(gameState, 0, int.MinValue, int.MaxValue)
             : MinValue(gameState, 0, int.MinValue, int.MaxValue);
+        searchTimer.Stop();
 
         if (!evmove.move.HasValue) return;
 
         Move move = evmove.move.Value;
+        Debug.Log($"MinMax search took {searchTimer.Elapsed.TotalMilliseconds:F2} ms and ran {i} Utility evaluations.");
         GameObject pieceObj = game.GetPosition(move.GetFromMatrixX(), move.GetFromMatrixY());
         game.MakeNextMove(pieceObj, move.GetMatrixX(), move.GetMatrixY(), move.GetIsAttack());
     }

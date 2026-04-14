@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
@@ -870,6 +871,7 @@ public class GameState
     private List<Move> GetMoves(string player, bool legalOnly)
     {
         var possibleMoves = new List<Move>();
+        var possibleAttackMoves = new List<Move>();
 
         foreach (var piece in GetPieces(player))
         {
@@ -881,7 +883,7 @@ public class GameState
 
             foreach (var move in pieceAttacks)
             {
-                possibleMoves.Add(new Move(piece.MatrixX, piece.MatrixY, move.x, move.y, true));
+                possibleAttackMoves.Add(new Move(piece.MatrixX, piece.MatrixY, move.x, move.y, true));
             }
 
             foreach (var move in pieceMoves)
@@ -889,8 +891,8 @@ public class GameState
                 possibleMoves.Add(new Move(piece.MatrixX, piece.MatrixY, move.x, move.y));
             }
         }
-
-        return possibleMoves;
+        possibleAttackMoves.AddRange(possibleMoves);
+        return possibleAttackMoves;
     }
 
     private void CachePossibleMoveCount(string player, int moveCount)
