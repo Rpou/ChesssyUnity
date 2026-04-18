@@ -647,12 +647,16 @@ public class GameState
                     break;
                 }
 
-                if (rookLikeAttack)
+                bool isMatchingSlider = rookLikeAttack
+                    ? piece.IsRook || piece.IsQueen
+                    : piece.IsBishop || piece.IsQueen;
+
+                if (isMatchingSlider)
                 {
-                    return piece.IsRook || piece.IsQueen;
+                    return true;
                 }
 
-                return piece.IsBishop || piece.IsQueen;
+                break;
             }
         }
 
